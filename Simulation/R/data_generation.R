@@ -1,66 +1,73 @@
 
 # simulation/R/data_generation.R
-# Contains: AR covariance, beta construction, and data generation.
+# Contains: block autoregression covariance construction, true coefficient generation, and data generation.
 
-round_int <- function(x) as.integer(round(x))
+## Logistic inverse fucntion (Used in MAR missingness later)
+inv_logit <- function(x) 1 / (1 + exp(-x))
 
-# Generate AR covariance matrix for predictors
-# p: number of predictors
-# rho: correlation strength (0 < rho < 1)
-make_sigma_ar1 <- function(p, rho) {
-  outer(1:p, 1:p, function(i, j) rho^abs(i - j))
+## Generate block autoregression covariance matrix
+## Within each block, each predictor has autoregression correlation with the others; 
+## Across blocks, each predictor is independent of the others.
+##
+## b   : block size
+## K   : number of blocks
+## rho : within-block autoregression correlation parameter (0 < rho < 1)
+##
+## Returns: p x p covariance matrix, where p = b * K
+
+make_sigma_block_ar1 <- function(b, K, rho) {
+  Sigma_block <- outer(1:b, 1:b, function(i, j) rho^abs(i - j))
+  Sigma <- matrix(0, nrow = b*K, ncol = b*K)
+  for (k in 1:K) {
+    idx <- ((k-1)*b + 1):(k*b)
+    Sigma[idx, idx] <- Sigma_block
+  }
+  Sigma
 }
 
-# Construct true coefficient vector beta
-# beta_type: "sparse" or "dense"
-# s: number of non-zero coefficients when sparse
-# signal: magnitude of signal
-make_beta <- function(p,
-                      beta_type = c("sparse", "dense"),
-                      s = 10,
-                      signal = 1.0,
-                      seed = NULL) {
+## Construct true coefficient vector beta
+##
+## p         : number of predictors
+## beta_type : "sparse" or "dense"
+## s         : number of non-zero coefficients when sparse
+## signal    : signal magnitude
+## seed      : optional seed for reproducibility
+##
+## Returns: beta (length p) true coefficient vector
+
+make_beta <- function(p, beta_type = c("sparse", "dense"),
+                      s = 10, signal = 1.0, seed = NULL) {
   beta_type <- match.arg(beta_type)
-  
   if (!is.null(seed)) set.seed(seed)
-  
   beta <- rep(0, p)
-  
   if (beta_type == "sparse") {
-    idx <- seq_len(min(s, p))
-    beta[idx] <- signal * sample(c(-1, 1), length(idx), replace = TRUE)
+    idx <- 1:s
+    signs <- sample(c(-1, 1), size = s, replace = TRUE)
+    beta[idx] <- signs * signal
   } else {
-    beta <- rnorm(p, mean = 0, sd = signal / sqrt(p))
+    beta[] <- signal / sqrt(p)
   }
-  
   beta
 }
 
-# Generate complete data (X, y) under linear model y = X beta + eps
-# setting must contain: n, p, rho, beta_type, s, signal, sigma_eps
-generate_data <- function(setting, seed = NULL) {
+## Generate complete data under linear model y = X beta + eps
+## setting must contain: n, b, K, rho, beta_type, s, signal, sigma_eps
+
+generate_complete_data <- function(n, b, K, rho, beta_type,
+                                   s = 10, signal = 1.0,
+                                   sigma_eps = 1.0, seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
   
-  n <- setting$n
-  p <- setting$p
-  rho <- setting$rho
+  p <- b * K
+  Sigma <- make_sigma_block_ar1(b, K, rho)
   
-  Sigma <- make_sigma_ar1(p, rho)
-  
-  # MASS::mvrnorm generates multivariate normal predictors
   X <- MASS::mvrnorm(n = n, mu = rep(0, p), Sigma = Sigma)
-  colnames(X) <- paste0("X", 1:p)
+  colnames(X) <- paste0("X", seq_len(p))
   
-  beta <- make_beta(
-    p = p,
-    beta_type = setting$beta_type,
-    s = setting$s,
-    signal = setting$signal,
-    seed = if (is.null(seed)) NULL else seed + 100
-  )
+  beta <- make_beta(p, beta_type, s, signal,
+                    seed = if (is.null(seed)) NULL else seed + 999)
   
-  y <- as.numeric(X %*% beta + rnorm(n, sd = setting$sigma_eps))
-  
-  list(X_full = X, y = y, beta_true = beta)
+  y <- as.numeric(X %*% beta + rnorm(n, sd = sigma_eps))
+  list(X = X, y = y, beta = beta)
 }
 

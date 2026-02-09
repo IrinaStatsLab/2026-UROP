@@ -1,4 +1,6 @@
 
+# simulation/R/config_protocol.R
+
 # Install Missing Packages and Load All Required Packages
 ## Notes on key packages:
 ## - MASS: multivariate normal generator (mvrnorm) used in the data generating mechanism
@@ -42,6 +44,8 @@ lambda_fixed <- 1.0             # Ridge penalty
 m_imp <- 20                     # number of imputations (use 5-10 for debugging)
 R_reps <- 200                   # number of Monte Carlo replications (use 1000 for final runs)
 
-## Prediction Evaluation Setting:
-n_test <- 1000                  # sample size for the independent test set
+## Simulation settings
+seed0 <- 123
+ncores <- max(1, parallel::detectCores() - 1)
+
 
