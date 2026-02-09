@@ -3,6 +3,7 @@
 # Run full simulation across scenarios and replicates
 
 ## Load packages
+library(ggplot2)
 library(MASS)
 library(mice)
 library(glmnet)
@@ -12,11 +13,11 @@ library(doParallel)
 library(doRNG)
 
 ## Source helper files
+source("simulation/R/config_protocol.R") 
 source("simulation/R/data_generation.R")
 source("simulation/R/impose_missingness.R")
 source("simulation/R/analysis_utility.R")
 source("simulation/R/one_simulation_replicate.R")
-source("simulation/R/config_protocol.R") 
 
 ## Run simulation 
 run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
@@ -54,8 +55,9 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
     "generate_complete_data",
     "impose_mcar", "impose_mar",
     "fit_ridge_fixed_lambda", "predict_ridge",
+    "make_sigma_block_ar1", "make_beta",
     "mse", "selected_topk", "jaccard",
-    "run_mice_pmm_safe",
+    "run_mice_pmm",
     "inv_logit"
   )
   
@@ -122,7 +124,47 @@ results <- run_simulation(
   ncores = ncores
 )
 
-cat("\n--- DONE. Scenario summaries: ---\n")
-print(results)
+# Data Visualization
+res_plot <- results %>%
+  mutate(
+    rho = factor(rho, levels = sort(unique(rho))),
+    pi  = factor(pi,  levels = sort(unique(pi))),
+    beta_type = factor(beta_type, levels = c("sparse", "dense")),
+    mechanism = factor(mechanism, levels = c("MCAR", "MAR"))
+  )
 
-# write.csv(results, "ridge_mi_paired_in_sample_results.csv", row.names = FALSE)
+# Heatmap for the Ratio
+p_heat_R <- ggplot(res_plot, aes(x = pi, y = rho, fill = ratio_R_mean)) +
+  geom_tile() +
+  geom_text(aes(label = sprintf("%.2f", ratio_R_mean)), size = 3) +
+  facet_grid(beta_type ~ mechanism) +
+  labs(
+    title = "Mean ratio R = pooled MSE / oracle MSE",
+    x = "Missingness level (pi)",
+    y = "Collinearity (rho)",
+    fill = "R mean"
+  ) +
+  theme_minimal()
+print(p_heat_R)
+
+# Heatmap for the Error
+p_err <- ggplot(res_plot, aes(x = rho, y = ratio_R_mean, group = pi)) +
+  geom_point() +
+  geom_line() +
+  geom_errorbar(aes(ymin = ratio_R_mean - ratio_R_sd,
+                    ymax = ratio_R_mean + ratio_R_sd),
+                width = 0.1) +
+  facet_grid(beta_type ~ mechanism) +
+  labs(
+    title = "Ratio R mean ± sd across Monte Carlo replicates",
+    x = "rho",
+    y = "ratio_R_mean",
+    group = "pi"
+  ) +
+  theme_minimal()
+print(p_err)
+
+cat("\n--- DONE. Scenario summaries: ---\n")
+results_table <- results %>%
+  arrange(mechanism, beta_type, rho, pi)
+print(results_table)
