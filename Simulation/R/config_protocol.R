@@ -11,7 +11,7 @@
 ## - doRNG:guarantees reproducible random number streams when running simulations in parallel.
 pkgs <- c("MASS", "mice", "glmnet", "dplyr", "foreach", "doParallel", "doRNG")
 for (pkg in pkgs) {
-  if (!requireNamespace(p, quietly = TRUE)) install.packages(pkg)
+  if (!requireNamespace(pkg, quietly = TRUE)) install.packages(pkg)
 }
 library(MASS) 
 library(mice)
