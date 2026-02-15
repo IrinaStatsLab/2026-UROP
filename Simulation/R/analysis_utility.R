@@ -13,8 +13,7 @@
 fit_ridge_fixed_lambda <- function(X_fit, y_fit, lambda_fixed) {
   glmnet::glmnet(
     x = X_fit, y = y_fit, alpha = 0,
-    lambda = lambda_fixed, standardize = TRUE
-  )
+    lambda = lambda_fixed, standardize = TRUE)
 }
 
 ## Predict from a fitted glmnet ridge model at its fitted lambda
