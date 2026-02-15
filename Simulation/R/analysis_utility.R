@@ -29,43 +29,55 @@ predict_ridge <- function(fit, X_eval) {
   as.numeric(predict(fit, newx = X_eval, s = fit$lambda))
 }
 
+## Extract coefficients from ridge fit
+coef_ridge <- function(fit) {
+  beta <- as.matrix(stats::coef(fit, s = fit$lambda))
+  beta <- beta[setdiff(rownames(beta), "(Intercept)"), , drop = FALSE]
+  out <- as.numeric(beta[, 1])
+  names(out) <- rownames(beta)
+  out
+}
+
 ## MSE Metrics
 mse <- function(y_true, y_pred) {
   mean((y_true - y_pred)^2)
 }
 
 ## Diagnostics:
-## Selection proxy: indices of top-k coefficients by absolute magnitude
-##
-## Note: 
-## Ridge does not perform variable selection. 
-## This top-k rule is used only as a *stability proxy* to compare which coefficients are emphasized across imputations.
-##
-## Settings:
-## beta_hat  : estimated coefficient vector (length p)
-## s_select  : k (number of top coefficients to return)
-##
-## Returns: sorted integer vector of selected indices
+## Permutation-threshold feature selection for RIDGE
+#  Parameters: 
+## X: n x p numeric matrix or data.frame of predictors
+## y: numeric response vector of length n
+## lambda_fixed: fixed ridge penalty parameter λ
+## perm_m: integer > 0; number of permutations used to estimate the null distribution of max |beta|
+## sel_alpha: numeric in (0,1); quantile level for threshold selection
 
-selected_topk <- function(beta_hat, s_select = 10) {
-  o <- order(abs(beta_hat), decreasing = TRUE)
-  sort(o[seq_len(min(s_select, length(o)))])
-}
-
-## Jaccard similarity between two sets of indices
-##
-## Settings:
-## A, B : integer vectors (selected sets)
-##
-## Returns:
-## J(A,B) = |A ∩ B| / |A ∪ B|, NA if union is empty
-
-jaccard <- function(A, B) {
-  A <- unique(A); B <- unique(B)
-  inter <- length(intersect(A, B))
-  uni <- length(union(A, B))
-  if (uni == 0) return(NA_real_)
-  inter / uni
+ridge_select_perm_threshold <- function(X, y, lambda_fixed,
+                                        perm_m = 30, sel_alpha = 0.95,
+                                        seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+  
+  X <- as.matrix(X)
+  y <- as.numeric(y)
+  lambda_fixed <- as.numeric(lambda_fixed)[1]
+  
+  # Fit on observed y
+  fit_obs  <- fit_ridge_fixed_lambda(X_fit = X, y_fit = y, lambda_fixed = lambda_fixed)
+  beta_obs <- coef_ridge(fit_obs)
+  
+  # Null distribution: permute y, refit ridge, record max |beta|
+  null_max <- numeric(perm_m)
+  for (m in seq_len(perm_m)) {
+    y_perm <- sample(y, replace = FALSE)
+    fit_null  <- fit_ridge_fixed_lambda(X_fit = X, y_fit = y_perm, lambda_fixed = lambda_fixed)
+    beta_null <- coef_ridge(fit_null)
+    null_max[m] <- max(abs(beta_null), na.rm = TRUE)
+  }
+  
+  threshold <- as.numeric(stats::quantile(null_max, probs = sel_alpha, names = FALSE, type = 7))
+  selected  <- abs(beta_obs) > threshold
+  
+  list(selected = selected, threshold = threshold, beta = beta_obs, null_max = null_max)
 }
 
 ## Wrapper for MICE using PMM(Predictive Mean Matching)
