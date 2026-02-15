@@ -31,7 +31,6 @@ make_sigma_block_ar1 <- function(b, K, rho) {
 ## beta_type : "sparse" or "dense"
 ## s         : number of non-zero coefficients when sparse
 ## signal    : signal magnitude
-## seed      : optional seed for reproducibility
 ##
 ## Returns: beta (length p) true coefficient vector
 
