@@ -31,7 +31,6 @@ impose_mcar <- function(X, pi, M_risk, seed = NULL) {
 # pi      : target missing proportion (0 < pi < 1)
 # M_risk  : indices of predictors subject to missingness
 # a1,a2,a3: coefficients controlling MAR dependence
-# seed    : optional seed for reproducibility
 #
 # Returns: Xmis, which denotes the predictor matrix with MAR missingness imposed
 
