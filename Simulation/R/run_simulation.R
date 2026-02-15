@@ -64,7 +64,7 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
   
   ## globals from config_protocol.R used inside run_one_replicate call
   export_globals <- c(
-    "n", "b", "K", "s", "signal", "sigma_eps",
+    "b", "K", "s", "signal", "sigma_eps",
     "M_risk", "lambda_fixed", "m_imp", "perm_m", "sel_alpha"
   )
   

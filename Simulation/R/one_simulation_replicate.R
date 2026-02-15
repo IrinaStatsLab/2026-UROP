@@ -55,7 +55,7 @@
   
   # If MICE fails, return NA summaries for missing arm 
   if (is.null(imp)) {
-    out0 <- data.frame(rho = rho, pi = pi, beta_type = beta_type, mechanism = mechanism,
+    out0 <- data.frame(n=n, rho = rho, pi = pi, beta_type = beta_type, mechanism = mechanism,
                        mse_full = mse_full, pooled_mse = NA_real_, ratio_R = NA_real_,
                        mse_imp_sd = NA_real_, within_imp_var = NA_real_,
                        sel_threshold = NA_real_, n_selected = NA_real_,l2_delta_beta = NA_real_,
@@ -128,7 +128,7 @@
   n_selected <- sum(sel_majority, na.rm = TRUE)
 
   # Return a Summary Table
-  out <- data.frame(rho = rho, pi = pi, beta_type = beta_type, mechanism = mechanism,
+  out <- data.frame(n = n, rho = rho, pi = pi, beta_type = beta_type, mechanism = mechanism,
                     mse_full = mse_full, pooled_mse = pooled_mse, ratio_R = ratio_R,
                     mse_imp_sd = mse_imp_sd, within_imp_var = within_imp_var,
                     sel_threshold = sel_threshold, n_selected = n_selected,
