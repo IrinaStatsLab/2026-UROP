@@ -89,6 +89,34 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
       )
     }
     
+    # MC simulation
+    ratios <- res$ratio_R
+    mu_hat <- mean(ratios, na.rm = TRUE)
+    sd_hat <- sd(ratios, na.rm = TRUE)
+    Z_vals <- (ratios - mu_hat) / sd_hat
+    Z_vals <- Z_vals[is.finite(Z_vals)]  # drop NA/Inf if sd_hat==0 etc.
+    tag_mc <- paste0("n", sc$n, "_rho", sc$rho, "_pi", sc$pi, "_", sc$beta_type, "_", sc$mechanism)
+    tag_mc <- gsub("[^A-Za-z0-9_.-]", "_", tag_mc)
+    
+    if (save_plots) {
+      if (!dir.exists(plot_dir)) dir.create(plot_dir, recursive = TRUE)
+            png(file.path(plot_dir, paste0("MC_Z_", tag_mc, ".png")),
+          width = 1000, height = 700)
+      
+      hist(Z_vals, breaks = 40, freq = FALSE,
+           main = paste0("Standardized Ratio R (Z) | ", tag_mc),
+           xlab = "Z")
+      curve(stats::dnorm(x, 0, 1), add = TRUE, col = "red", lwd = 2)
+      
+      dev.off()
+    }
+    
+    # MC variance diagnostic
+    mse_imp_vals <- res$pooled_mse
+    var_imp <- var(mse_imp_vals, na.rm = TRUE)
+    delta_var_ratio <- var_imp / (length(na.omit(mse_imp_vals)) * mean(res$mse_full, na.rm=TRUE)^2)
+    delta_sd_ratio  <- sqrt(delta_var_ratio)
+    
     ## Selection stability plot (Times Selected) per scenario
     sel_cols <- grep("^sel_X\\d+$", names(res), value = TRUE)
     if (save_plots && length(sel_cols) > 0) {
@@ -118,7 +146,7 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
         ) +
         theme_minimal()
       
-      tag <- paste0("rho", sc$rho, "_pi", sc$pi, "_", sc$beta_type, "_", sc$mechanism)
+      tag <- paste0("n", sc$n, "_rho", sc$rho, "_pi", sc$pi, "_", sc$beta_type, "_", sc$mechanism)
       tag <- gsub("[^A-Za-z0-9_.-]", "_", tag)
       ggplot2::ggsave(
         filename = file.path(plot_dir, paste0("stability_", tag, ".png")),
@@ -213,5 +241,5 @@ print(p_err)
 
 cat("\n--- DONE. Scenario summaries: ---\n")
 results_table <- results %>%
-  arrange(mechanism, beta_type, rho, pi)
+  arrange(mechanism, beta_type, n, rho, pi)
 print(results_table)
