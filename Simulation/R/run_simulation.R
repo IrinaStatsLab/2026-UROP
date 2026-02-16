@@ -111,7 +111,7 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
       dev.off()
     }
     
-    # MC variance diagnostic
+    # MC variance diagnostics
     mse_imp_vals <- res$pooled_mse
     var_imp <- var(mse_imp_vals, na.rm = TRUE)
     delta_var_ratio <- var_imp / (length(na.omit(mse_imp_vals)) * mean(res$mse_full, na.rm=TRUE)^2)
