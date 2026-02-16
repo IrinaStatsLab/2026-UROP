@@ -24,17 +24,19 @@ library(doParallel)
 library(doRNG) 
 
 ## Global constants (Protocol)
-n <- 1000                       # sample size for the main (analysis) dataset
 b <- 10                         # block size
 K <- 5                          # number of blocks
 p <- b * K                      # total number of predictors (50)
 M_risk <- 11:30                 # 20 predictors can be missing; others are anchors
 
-## Scenario grids (factorial design)
-rho_grid <- c(0.2, 0.5, 0.8)    # Autoregression correlation strength among predictors
-pi_grid  <- c(0.2, 0.5, 0.8)    # missingness proportion among M_risk variables
-beta_grid <- c("sparse", "dense")
-mech_grid <- c("MCAR", "MAR")
+# Fixed Scenario grids
+beta_grid <- c("sparse")
+mech_grid <- c("MCAR")
+
+# Varied Scenario grids
+rho_grid <- c(0.2, 0.5, 0.8) # Autoregression correlation strength among predictors
+pi_grid  <- c(0.2, 0.5, 0.8) # missingness proportion among M_risk variables
+n_grid   <- c(500, 1000) # sample size
 
 ## Settings
 s <- 10                         # number of nonzero coefficients in sparse setting
@@ -42,9 +44,13 @@ signal <- 1.0                   # coefficient magnitude / signal strength
 sigma_eps <- 1.0                # noise SD in outcome model
 lambda_fixed <- 1.0             # Ridge penalty 
 
+## Feature selection settings
+perm_m <- 30                     # permutations per replicate (null max|beta|)
+sel_alpha <- 0.95                # quantile for selection threshold
+
 ## MI settings
-m_imp <- 20                     # number of imputations (use 5-10 for debugging)
-R_reps <- 200                   # number of Monte Carlo replications (use 1000 for final runs)
+m_imp <- 5                    
+R_reps <- 200                   # number of Monte Carlo replications 
 
 ## Simulation settings
 seed0 <- 123
