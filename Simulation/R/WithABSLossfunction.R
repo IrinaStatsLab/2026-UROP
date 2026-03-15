@@ -1,245 +1,149 @@
 
-# simulation/R/run_simulation.R
-# Run full simulation across scenarios and replicates
+# simulation/R/analysis_utility.R
+# Contains: lasso regression fit, MSE metrics, selection stability diagnostics, Mice wrapper
 
-## Load packages
-library(ggplot2)
-library(MASS)
-library(mice)
-library(glmnet)
-library(dplyr)
-library(foreach)
-library(doParallel)
-library(doRNG)
+## Fit lasso Regression Model with a Fixed Penalty (lambda)
+## Settings:
+## X_fit        : n x p numeric matrix 
+## y_fit        : response vector (length n)
+## lambda_fixed : fixed lasso penalty (scalar > 0)
+##
+## Returns: glmnet model object (with alpha = 1 for Lasso)
 
-## Source helper files
-source("simulation/R/config_protocol.R") 
-source("simulation/R/data_generation.R")
-source("simulation/R/impose_missingness.R")
-source("simulation/R/analysis_utility.R")
-source("simulation/R/one_simulation_replicate.R")
-
-## Run simulation 
-run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
-                           R_reps, seed0, ncores, save_plots = TRUE, plot_dir = "simulation/outputs") {
-  
-  scenarios <- expand.grid(
-    n = n_grid,
-    rho = rho_grid,
-    pi = pi_grid,
-    beta_type = beta_grid,
-    mechanism = mech_grid,
-    stringsAsFactors = FALSE
-  )
-  
-  ## sanitize ncores
-  ncores <- as.integer(ncores)
-  if (is.na(ncores) || ncores < 1) ncores <- 1
-  max_cores <- parallel::detectCores()
-  ncores <- min(ncores, max_cores)
-  
-  cl <- parallel::makeCluster(ncores)
-  doParallel::registerDoParallel(cl)
-  doRNG::registerDoRNG(seed0)
-  
-  ## Ensure cluster is stopped even if error happens
-  on.exit({
-    try(parallel::stopCluster(cl), silent = TRUE)
-  }, add = TRUE)
-  
-  ## Store scenario-level summaries
-  out_all <- vector("list", nrow(scenarios))
-  
-  ## objects/functions that each worker must see
-  export_objs <- c(
-    "run_one_replicate",
-    "generate_complete_data",
-    "impose_mcar", "impose_mar",
-    "fit_ridge_fixed_lambda", "predict_ridge", "coef_ridge",
-    "make_sigma_block_ar1", "make_beta",
-    "mse", "ridge_select_perm_threshold",
-    "run_mice_pmm",
-    "inv_logit"
-  )
-  
-  ## globals from config_protocol.R used inside run_one_replicate call
-  export_globals <- c(
-    "b", "K", "s", "signal", "sigma_eps",
-    "M_risk", "lambda_fixed", "m_imp", "perm_m", "sel_alpha"
-  )
-  
-  for (scen in seq_len(nrow(scenarios))) {
-    sc <- scenarios[scen, ]
-    
-    res <- foreach::foreach(
-      r = seq_len(R_reps),
-      .combine = dplyr::bind_rows,
-      .packages = c("MASS", "mice", "glmnet", "dplyr", "doRNG"),
-      .export = c(export_objs, export_globals)
-    ) %dopar% {
-      run_one_replicate(
-        rho = sc$rho,
-        pi = sc$pi,
-        beta_type = sc$beta_type,
-        mechanism = sc$mechanism,
-        n = sc$n, b = b, K = K, s = s, signal = signal, sigma_eps = sigma_eps,
-        M_risk = M_risk, lambda_fixed = lambda_fixed, m_imp = m_imp,
-        perm_m = perm_m, sel_alpha = sel_alpha,
-        seed = seed0 + 100000 * scen + r
-      )
-    }
-    
-    # MC simulation
-    ratios <- res$ratio_R
-    mu_hat <- mean(ratios, na.rm = TRUE)
-    sd_hat <- sd(ratios, na.rm = TRUE)
-    Z_vals <- (ratios - mu_hat) / sd_hat
-    Z_vals <- Z_vals[is.finite(Z_vals)]  # drop NA/Inf if sd_hat==0 etc.
-    tag_mc <- paste0("n", sc$n, "_rho", sc$rho, "_pi", sc$pi, "_", sc$beta_type, "_", sc$mechanism)
-    tag_mc <- gsub("[^A-Za-z0-9_.-]", "_", tag_mc)
-    
-    if (save_plots) {
-      if (!dir.exists(plot_dir)) dir.create(plot_dir, recursive = TRUE)
-      png(file.path(plot_dir, paste0("MC_Z_", tag_mc, ".png")),
-          width = 1000, height = 700)
-      
-      hist(Z_vals, breaks = 40, freq = FALSE,
-           main = paste0("Standardized Ratio R (Z) | ", tag_mc),
-           xlab = "Z")
-      curve(stats::dnorm(x, 0, 1), add = TRUE, col = "red", lwd = 2)
-      
-      dev.off()
-    }
-    
-    # MC variance diagnostics
-    mse_imp_vals <- res$pooled_mse
-    var_imp <- var(mse_imp_vals, na.rm = TRUE)
-    delta_var_ratio <- var_imp / (length(na.omit(mse_imp_vals)) * mean(res$mse_full, na.rm=TRUE)^2)
-    delta_sd_ratio  <- sqrt(delta_var_ratio)
-    
-    ## Selection stability plot (Times Selected) per scenario
-    sel_cols <- grep("^sel_X\\d+$", names(res), value = TRUE)
-    if (save_plots && length(sel_cols) > 0) {
-      # Coerce to numeric 0/1 and sum across replicates; NA treated as 0
-      sel_counts <- colSums(as.data.frame(lapply(res[sel_cols], function(x) {
-        x <- as.numeric(x)
-        x[is.na(x)] <- 0
-        x
-      })))
-      
-      df_sel <- data.frame(
-        Feature = sub("^sel_", "", names(sel_counts)),
-        TimesSelected = as.integer(sel_counts),
-        stringsAsFactors = FALSE
-      )
-      df_sel <- df_sel[order(df_sel$TimesSelected, decreasing = TRUE), ]
-      
-      p_sel <- ggplot(df_sel, aes(x = TimesSelected, y = reorder(Feature, TimesSelected))) +
-        geom_col() +
-        labs(
-          title = paste0(
-            "Feature Selection Stability (", R_reps, " runs) | ",
-            "rho=", sc$rho, ", pi=", sc$pi, ", ", sc$beta_type, ", ", sc$mechanism
-          ),
-          x = "Times Selected",
-          y = "Feature"
-        ) +
-        theme_minimal()
-      
-      tag <- paste0("n", sc$n, "_rho", sc$rho, "_pi", sc$pi, "_", sc$beta_type, "_", sc$mechanism)
-      tag <- gsub("[^A-Za-z0-9_.-]", "_", tag)
-      ggplot2::ggsave(
-        filename = file.path(plot_dir, paste0("stability_", tag, ".png")),
-        plot = p_sel, width = 11, height = 7, dpi = 200
-      )
-      utils::write.csv(
-        df_sel,
-        file = file.path(plot_dir, paste0("stability_", tag, ".csv")),
-        row.names = FALSE
-      )
-    }
-    
-    summ <- res %>%
-      summarise(
-        n = first(n),
-        rho = first(rho),
-        pi = first(pi),
-        beta_type = first(beta_type),
-        mechanism = first(mechanism),
-        mse_full_mean = mean(mse_full, na.rm = TRUE),
-        pooled_mse_mean = mean(pooled_mse, na.rm = TRUE),
-        ratio_R_mean = mean(ratio_R, na.rm = TRUE),
-        ratio_R_sd = sd(ratio_R, na.rm = TRUE),
-        sel_threshold_mean = if ("sel_threshold" %in% names(res)) mean(sel_threshold, na.rm = TRUE) else NA_real_,
-        n_selected_mean = if ("n_selected" %in% names(res)) mean(n_selected, na.rm = TRUE) else NA_real_,
-        imp_fail_rate = mean(imp_failed),
-        .groups = "drop"
-      )
-    
-    print(summ)
-    
-    out_all[[scen]] <- summ
-    # results_all[[scen]] <- res
-  }
-  
-  ## return scenario summaries 
-  dplyr::bind_rows(out_all)
+fit_lasso_fixed_lambda <- function(X_fit, y_fit, lambda_fixed) {
+  glmnet::glmnet(
+    x = X_fit, y = y_fit, alpha = 1,
+    lambda = lambda_fixed, standardize = TRUE)
 }
 
-## Execute
-cat("\n--- Running paired simulation ---\n")
+## Predict from a fitted glmnet lasso model at its fitted lambda
+##
+## Settings:
+## fit    : glmnet model object returned by fit_lasso_fixed_lambda()
+## X_eval : n_eval x p matrix for evaluation
+##
+## Returns: numeric vector of predictions (length n_eval)
 
-results <- run_simulation(
-  rho_grid = rho_grid,
-  pi_grid = pi_grid,
-  beta_grid = beta_grid,
-  mech_grid = mech_grid,
-  R_reps = R_reps,
-  seed0 = seed0,
-  ncores = ncores
-)
+predict_lasso <- function(fit, X_eval) {
+  as.numeric(predict(fit, newx = X_eval, s = fit$lambda))
+}
 
-# Data Visualization
-res_plot <- results %>%
-  mutate(
-    rho = factor(rho, levels = sort(unique(rho))),
-    pi  = factor(pi,  levels = sort(unique(pi))),
-    beta_type = factor(beta_type, levels = c("sparse", "dense")),
-    mechanism = factor(mechanism, levels = c("MCAR", "MAR"))
+## Extract coefficients from lasso fit
+coef_lasso <- function(fit) {
+  beta <- as.matrix(stats::coef(fit, s = fit$lambda))
+  beta <- beta[setdiff(rownames(beta), "(Intercept)"), , drop = FALSE]
+  out <- as.numeric(beta[, 1])
+  names(out) <- rownames(beta)
+  out
+}
+
+##Var and SD estimation by regular bootstrapping
+bootstrap_lasso_mse <- function(X, y, B,lambda){
+  
+  n <- nrow(X)
+  mse_vec <- numeric(B)
+  
+  for(b in 1:B){
+    
+    # bootstrap sample
+    idx <- sample(1:n, n, replace = TRUE)
+    
+    X_boot <- X[idx, ]
+    y_boot <- y[idx]
+    
+    # out-of-bag samples
+    oob <- setdiff(1:n, unique(idx))
+    
+    if(length(oob) == 0) next
+    
+    X_test <- X[oob, ]
+    y_test <- y[oob]
+    
+    # fit lasso
+    fit <- fit_lasso_fixed_lambda(X_fit = X_boot, y_fit = y_boot,lambda_fixed = lambda )
+    
+    # prediction
+    pred <- predict_lasso(fit = fit, X_eval = X_test)
+    
+    # compute MSE
+    mse_vec[b] <- mean((y_test - pred)^2)
+    
+  }
+  
+  mse_vec <- mse_vec[mse_vec != 0]
+  
+  list(
+    mean_MSE = mean(mse_vec),
+    var_MSE = var(mse_vec),
+    sd_MSE = sd(mse_vec),
+    mse_samples = mse_vec
   )
+}
 
-# Heatmap for the Ratio
-p_heat_R <- ggplot(res_plot, aes(x = pi, y = rho, fill = ratio_R_mean)) +
-  geom_tile() +
-  geom_text(aes(label = sprintf("%.2f", ratio_R_mean)), size = 3) +
-  facet_grid(beta_type ~ mechanism) +
-  labs(
-    title = "Mean ratio R = pooled MSE / oracle MSE",
-    x = "Missingness level (pi)",
-    y = "Collinearity (rho)",
-    fill = "R mean"
-  ) +
-  theme_minimal()
-print(p_heat_R)
 
-# Heatmap for the Error
-p_err <- ggplot(res_plot, aes(x = rho, y = ratio_R_mean, group = pi)) +
-  geom_point() +
-  geom_line() +
-  geom_errorbar(aes(ymin = ratio_R_mean - ratio_R_sd,
-                    ymax = ratio_R_mean + ratio_R_sd),
-                width = 0.1) +
-  facet_grid(beta_type ~ mechanism) +
-  labs(
-    title = "Ratio R mean ± sd across Monte Carlo replicates",
-    x = "rho",
-    y = "ratio_R_mean",
-    group = "pi"
-  ) +
-  theme_minimal()
-print(p_err)
 
-cat("\n--- DONE. Scenario summaries: ---\n")
-results_table <- results %>%
-  arrange(mechanism, beta_type, n, rho, pi)
-print(results_table)
+
+
+
+## MSE Metrics
+mse <- function(y_true, y_pred) {
+  mean((y_true - y_pred)^2)
+}
+
+## Diagnostics:
+## Permutation-threshold feature selection for lasso
+#  Parameters: 
+## X: n x p numeric matrix or data.frame of predictors
+## y: numeric response vector of length n
+## lambda_fixed: fixed lasso penalty parameter λ
+## perm_m: integer > 0; number of permutations used to estimate the null distribution of max |beta|
+## sel_alpha: numeric in (0,1); quantile level for threshold selection
+
+lasso_select_perm_threshold <- function(X, y, lambda_fixed,
+                                        perm_m = 30, sel_alpha = 0.95,
+                                        seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+  
+  X <- as.matrix(X)
+  y <- as.numeric(y)
+  lambda_fixed <- as.numeric(lambda_fixed)[1]
+  
+  # Fit on observed y
+  fit_obs  <- fit_lasso_fixed_lambda(X_fit = X, y_fit = y, lambda_fixed = lambda_fixed)
+  beta_obs <- coef_lasso(fit_obs)
+  
+  # Null distribution: permute y, refit lasso, record max |beta|
+  null_max <- numeric(perm_m)
+  for (m in seq_len(perm_m)) {
+    y_perm <- sample(y, replace = FALSE)
+    fit_null  <- fit_lasso_fixed_lambda(X_fit = X, y_fit = y_perm, lambda_fixed = lambda_fixed)
+    beta_null <- coef_lasso(fit_null)
+    null_max[m] <- max(abs(beta_null), na.rm = TRUE)
+  }
+  
+  threshold <- as.numeric(stats::quantile(null_max, probs = sel_alpha, names = FALSE, type = 7))
+  selected  <- abs(beta_obs) > threshold
+  
+  list(selected = selected, threshold = threshold, beta = beta_obs, null_max = null_max)
+}
+
+## Wrapper for MICE using PMM(Predictive Mean Matching)
+##
+## Purpose: Run multiple imputation while preventing the entire simulation from crashing when mice() fails 
+## (e.g., due to extreme missingness).
+##
+## Settings:
+## df   : data.frame containing predictors (with NAs) and any fully observed vars (e.g., y)
+## m    : number of imputations
+## seed : Seed for reproducibility
+##
+## Returns: mice::mids object if successful; otherwise NULL
+
+run_mice_pmm <- function(df, m, seed) {
+  tryCatch(
+    mice::mice(df, m = m, method = "pmm", printFlag = FALSE, seed = seed),
+    error = function(e) NULL
+  )
+}
+  
+  
