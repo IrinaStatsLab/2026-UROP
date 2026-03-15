@@ -100,7 +100,7 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
     
     if (save_plots) {
       if (!dir.exists(plot_dir)) dir.create(plot_dir, recursive = TRUE)
-            png(file.path(plot_dir, paste0("MC_Z_", tag_mc, ".png")),
+      png(file.path(plot_dir, paste0("MC_Z_", tag_mc, ".png")),
           width = 1000, height = 700)
       
       hist(Z_vals, breaks = 40, freq = FALSE,
