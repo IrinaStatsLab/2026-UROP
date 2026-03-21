@@ -2,3 +2,10 @@
 .Rhistory
 .RData
 .Ruserdata
+# Ignore simulation outputs
+Simulation/outputs/
+Simulation_Pooling_Strategy/outputs/
+# Ignore plots
+Rplot*.png
+# Ignore result files
+*.csv
