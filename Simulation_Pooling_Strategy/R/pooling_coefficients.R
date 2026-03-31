@@ -26,23 +26,21 @@ pool_beta_geo <- function(beta_mat, eps = 1e-8) {
 # beta_mat : coefficient matrix with rows = coefficients and columns = imputations
 # Returns a pooled coefficient vector based on the rank-1 SVD approximation of the coefficient matrix
 pool_beta_svd <- function(beta_mat) {
+  beta_mat <- as.matrix(beta_mat)
   sv <- svd(beta_mat)
   
-  # coefficient space
-  u1 <- sv$u[, 1]
-  # variation size
-  d1 <- sv$d[1]
-  # weights for every imputation
+  betamean <- rowMeans(beta_mat)
   v1 <- sv$v[, 1]
   
-  # Rank-1 reconstruction
-  beta_rank1 <- d1 * u1 %*% t(v1)
+  beta_pool <- beta_mat %*% v1
   
-  # Average reconstructed coefficients across imputations
-  beta_pool <- rowMeans(beta_rank1)
-  names(beta_pool) <- rownames(beta_mat)
+  # sign alignment
+  if (drop(crossprod(beta_pool, betamean)) < 0) {
+    v1 <- -v1
+    beta_pool <- -beta_pool
+  }
   
-  return(beta_pool)
+  return(as.vector(beta_pool))
 }
 
 # Wrapper function to pool coefficients using all methods
