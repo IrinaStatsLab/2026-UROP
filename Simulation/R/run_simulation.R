@@ -100,13 +100,18 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
     
     if (save_plots) {
       if (!dir.exists(plot_dir)) dir.create(plot_dir, recursive = TRUE)
-            png(file.path(plot_dir, paste0("MC_Z_", tag_mc, ".png")),
+      
+      png(file.path(plot_dir, paste0("MC_R_", tag_mc, ".png")),
           width = 1000, height = 700)
       
-      hist(Z_vals, breaks = 40, freq = FALSE,
-           main = paste0("Standardized Ratio R (Z) | ", tag_mc),
-           xlab = "Z")
-      curve(stats::dnorm(x, 0, 1), add = TRUE, col = "red", lwd = 2)
+      hist(ratios, breaks = 40, freq = FALSE,
+           main = paste0("Raw Ratio R | ", tag_mc),
+           xlab = "Ratio R")
+      
+      # optional: overlay a normal curve using sample mean/sd
+      curve(dnorm(x, mean(ratios, na.rm = TRUE), 
+                  sd(ratios, na.rm = TRUE)),
+            add = TRUE, col = "red", lwd = 2)
       
       dev.off()
     }
