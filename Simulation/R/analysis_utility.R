@@ -37,6 +37,17 @@ coef_ridge <- function(fit) {
   out
 }
 
+## Extract intercept from ridge fit
+intercept_ridge <- function(fit) {
+  beta_all <- as.matrix(stats::coef(fit, s = fit$lambda))
+  as.numeric(beta_all["(Intercept)", 1])
+}
+
+## Predict from pooled coefficients + intercept
+predict_from_pooled_beta <- function(beta, intercept, X_eval) {
+  as.numeric(intercept + X_eval %*% beta)
+}
+
 ## MSE Metrics
 mse <- function(y_true, y_pred) {
   mean((y_true - y_pred)^2)
