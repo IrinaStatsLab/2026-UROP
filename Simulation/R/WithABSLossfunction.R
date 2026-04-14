@@ -145,5 +145,33 @@ run_mice_pmm <- function(df, m, seed) {
     error = function(e) NULL
   )
 }
-  
+
+library(dplyr)
+library(ggplot2)
+library(readr)
+
+df1 <- MAR_and_DENSE %>%
+  mutate(mechanism = "MAR", beta_type = "Dense")
+
+df2 <- MAR_and_Sparse %>%
+  mutate(mechanism = "MAR", beta_type = "Sparse")
+
+df3 <- MCAR_and_DENSE %>%
+  mutate(mechanism = "MCAR", beta_type = "Dense")
+
+df4 <- MCAR_and_Sparse %>%
+  mutate(mechanism = "MCAR", beta_type = "Sparse")
+
+df <- bind_rows(df1, df2, df3, df4)
+
+ggplot(df, aes(x = factor(pi), y = ratio_R_mean)) +
+  geom_boxplot(alpha = 0.6) +
+  stat_summary(fun = mean, geom = "point", size = 3) +
+  facet_grid(beta_type ~ mechanism) +
+  labs(
+    x = "Missingness proportion (π)",
+    y = "R = MSE_pooled / MSE_full"
+  ) +
+  theme_minimal(base_size = 14)
+
   
