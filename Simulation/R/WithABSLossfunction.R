@@ -174,4 +174,53 @@ ggplot(df, aes(x = factor(pi), y = ratio_R_mean)) +
   ) +
   theme_minimal(base_size = 14)
 
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(tidyr)
+
+df1 <- read_csv("results_dense_MAR.csv") %>%
+  mutate(mechanism = "MAR", beta_type = "Dense")
+
+df2 <- read_csv("results_sparse_MAR.csv") %>%
+  mutate(mechanism = "MAR", beta_type = "Sparse")
+
+df3 <- read_csv("results_table_dense_MCAR.csv") %>%
+  mutate(mechanism = "MCAR", beta_type = "Dense")
+
+df4 <- read_csv("results_sparse_MCAR.csv") %>%
+  mutate(mechanism = "MCAR", beta_type = "Sparse")
+
+df <- bind_rows(df1, df2, df3, df4) %>%
+  mutate(pi = as.numeric(pi))
+
+df_long <- df %>%
+  select(pi, mechanism, beta_type, ratio_R_mean, ratio_R_coef_mean) %>%
+  pivot_longer(
+    cols = c(ratio_R_mean, ratio_R_coef_mean),
+    names_to = "method",
+    values_to = "R"
+  ) %>%
+  mutate(
+    method = recode(
+      method,
+      ratio_R_mean = "Pool MSE",
+      ratio_R_coef_mean = "Pool Coefficient"
+    )
+  )
+
+ggplot(df_long, aes(x = pi, y = R, color = method, group = method)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2.5) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  facet_grid(beta_type ~ mechanism) +
+  labs(
+    x = "Missingness proportion (π)",
+    y = "R",
+    color = "Pooling Strategy"
+  ) +
+  theme_minimal(base_size = 14)
+theme(
+  legend.position = "bottom",
+)
   
