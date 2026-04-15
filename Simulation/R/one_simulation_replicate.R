@@ -168,6 +168,5 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
     l2_delta_beta = l2_delta_beta,
     imp_failed = FALSE
   )
-  
   cbind(out, sel_df)
 }
