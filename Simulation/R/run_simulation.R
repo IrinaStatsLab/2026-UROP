@@ -17,6 +17,7 @@ source("simulation/R/config_protocol.R")
 source("simulation/R/data_generation.R")
 source("simulation/R/impose_missingness.R")
 source("simulation/R/analysis_utility.R")
+source("simulation/R/pooling_coeffcients.R")
 source("simulation/R/one_simulation_replicate.R")
 
 ## Run simulation 
@@ -56,6 +57,8 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
     "generate_complete_data",
     "impose_mcar", "impose_mar",
     "fit_ridge_fixed_lambda", "predict_ridge", "coef_ridge",
+    "intercept_ridge", "predict_from_pooled_beta",
+    "pool_beta_mean",
     "make_sigma_block_ar1", "make_beta",
     "mse", "ridge_select_perm_threshold",
     "run_mice_pmm",
@@ -172,9 +175,22 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
         beta_type = first(beta_type),
         mechanism = first(mechanism),
         mse_full_mean = mean(mse_full, na.rm = TRUE),
+        
         pooled_mse_mean = mean(pooled_mse, na.rm = TRUE),
-        ratio_R_mean = mean(ratio_R, na.rm = TRUE),
-        ratio_R_sd = sd(ratio_R, na.rm = TRUE),
+        pooled_mse_sd   = sd(pooled_mse, na.rm = TRUE),
+        
+        ratio_R_mean    = mean(ratio_R, na.rm = TRUE),
+        ratio_R_sd      = sd(ratio_R, na.rm = TRUE),
+        
+        pooled_coef_mse_mean = mean(pooled_coef_mse, na.rm = TRUE),
+        pooled_coef_mse_sd   = sd(pooled_coef_mse, na.rm = TRUE),
+        
+        ratio_R_coef_mean = mean(ratio_R_coef, na.rm = TRUE),
+        ratio_R_coef_sd   = sd(ratio_R_coef, na.rm = TRUE),
+        
+        mse_diff_mean = mean(mse_diff, na.rm = TRUE),
+        mse_diff_sd   = sd(mse_diff, na.rm = TRUE),
+        
         sel_threshold_mean = if ("sel_threshold" %in% names(res)) mean(sel_threshold, na.rm = TRUE) else NA_real_,
         n_selected_mean = if ("n_selected" %in% names(res)) mean(n_selected, na.rm = TRUE) else NA_real_,
         imp_fail_rate = mean(imp_failed),
@@ -201,48 +217,50 @@ results <- run_simulation(
   mech_grid = mech_grid,
   R_reps = R_reps,
   seed0 = seed0,
-  ncores = ncores
+  ncores = ncores,
+  save_plots = FALSE
 )
 
-# Data Visualization
+library(tidyr)
+
+# Data Visualization: compare Pool MSE vs Pooled Coefficient across missingness level
 res_plot <- results %>%
   mutate(
     rho = factor(rho, levels = sort(unique(rho))),
-    pi  = factor(pi,  levels = sort(unique(pi))),
+    pi  = factor(pi, levels = sort(unique(pi))),
     beta_type = factor(beta_type, levels = c("sparse", "dense")),
     mechanism = factor(mechanism, levels = c("MCAR", "MAR"))
+  ) %>%
+  pivot_longer(
+    cols = c(ratio_R_mean, ratio_R_coef_mean),
+    names_to = "method",
+    values_to = "R_mean"
+  ) %>%
+  mutate(
+    method = recode(
+      method,
+      ratio_R_mean = "Pool MSE",
+      ratio_R_coef_mean = "Pooled Coefficient"
+    )
   )
 
-# Heatmap for the Ratio
-p_heat_R <- ggplot(res_plot, aes(x = pi, y = rho, fill = ratio_R_mean)) +
-  geom_tile() +
-  geom_text(aes(label = sprintf("%.2f", ratio_R_mean)), size = 3) +
-  facet_grid(beta_type ~ mechanism) +
+p_compare <- ggplot(
+  res_plot,
+  aes(x = pi, y = R_mean, group = method, color = method, shape = method)
+) +
+  geom_point(size = 2.8) +
+  geom_line(linewidth = 0.8) +
+  facet_grid(beta_type + rho ~ mechanism) +
   labs(
-    title = "Mean ratio R = pooled MSE / oracle MSE",
-    x = "Missingness level (pi)",
-    y = "Collinearity (rho)",
-    fill = "R mean"
+    title = "Relative MSE Compared with Complete-Data Benchmark",
+    x = "Missingness proportion (pi)",
+    y = "R = MSE on imputed data / MSE on complete data",
+    color = "Method",
+    shape = "Method"
   ) +
-  theme_minimal()
-print(p_heat_R)
+  theme_minimal(base_size = 14)
 
-# Heatmap for the Error
-p_err <- ggplot(res_plot, aes(x = rho, y = ratio_R_mean, group = pi)) +
-  geom_point() +
-  geom_line() +
-  geom_errorbar(aes(ymin = ratio_R_mean - ratio_R_sd,
-                    ymax = ratio_R_mean + ratio_R_sd),
-                width = 0.1) +
-  facet_grid(beta_type ~ mechanism) +
-  labs(
-    title = "Ratio R mean ± sd across Monte Carlo replicates",
-    x = "rho",
-    y = "ratio_R_mean",
-    group = "pi"
-  ) +
-  theme_minimal()
-print(p_err)
+print(p_compare)
 
 cat("\n--- DONE. Scenario summaries: ---\n")
 results_table <- results %>%
