@@ -65,6 +65,9 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
   for (scen in seq_len(nrow(scenarios))) {
     sc <- scenarios[scen, ]
     
+    cat("\nScenario", scen, "/", nrow(scenarios), "\n")
+    flush.console()
+    
     res <- foreach::foreach(
       r = seq_len(R_reps),
       .combine = dplyr::bind_rows,

@@ -7,6 +7,8 @@
 # 3) Missing-data arm: impose missingness on X_full, perform MICE,
 #    fit ridge on each imputed dataset, and evaluate all MI-based MSEs on the corresponding imputed dataset Xj.
 
+cat(">>> Start replicate\n"); flush.console()
+
 run_one_replicate <- function(rho, pi, beta_type, mechanism,
                               n, b, K, s, signal, sigma_eps,
                               M_risk, lambda_mode, m_imp, perm_m, sel_alpha, seed) {
@@ -43,7 +45,7 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
   }
   X_mis <- as.matrix(X_mis)
   colnames(X_mis) <- colnames(X_full)
-  
+
   ## Multiple imputation
   df_mis <- as.data.frame(X_mis)
   df_mis$y <- y
@@ -92,6 +94,7 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
   
   ## Per-imputation fit
   for (j in seq_len(m_imp)) {
+    
     df_j <- tryCatch(mice::complete(imp, action = j), error = function(e) NULL)
     if (is.null(df_j)) next
     

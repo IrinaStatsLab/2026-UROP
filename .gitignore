@@ -9,3 +9,4 @@ Simulation_Pooling_Strategy/outputs/
 Rplot*.png
 # Ignore result files
 *.csv
+results_table.csv
