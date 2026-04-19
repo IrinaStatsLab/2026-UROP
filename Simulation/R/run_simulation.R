@@ -50,6 +50,7 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
   
   ## Store scenario-level summaries
   out_all <- vector("list", nrow(scenarios))
+  results_all <- vector("list", nrow(scenarios))
   
   ## objects/functions that each worker must see
   export_objs <- c(
@@ -200,17 +201,19 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
     print(summ)
     
     out_all[[scen]] <- summ
-    # results_all[[scen]] <- res
+    results_all[[scen]] <- res
   }
   
   ## return scenario summaries 
-  dplyr::bind_rows(out_all)
+  list(
+    summary = dplyr::bind_rows(out_all),
+    replicate = dplyr::bind_rows(results_all)
+  )
 }
 
 ## Execute
 cat("\n--- Running paired simulation ---\n")
-
-results <- run_simulation(
+sim_out <- run_simulation(
   rho_grid = rho_grid,
   pi_grid = pi_grid,
   beta_grid = beta_grid,
@@ -220,6 +223,8 @@ results <- run_simulation(
   ncores = ncores,
   save_plots = FALSE
 )
+results <- sim_out$summary
+replicate_results <- sim_out$replicate
 
 library(tidyr)
 
