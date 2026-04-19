@@ -1,4 +1,4 @@
-# Simulation/R/pool_coeffcients.R
+# R/pool_coeffcients.R
 # Purpose: Pool coefficient vectors beta_1, ..., beta_m obtained from the imputed training datasets using different pooling strategies.
 
 # Simple mean pooling 

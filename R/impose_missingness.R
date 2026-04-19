@@ -1,5 +1,5 @@
 
-# simulation/R/impose_missingness.R
+# R/impose_missingness.R
 # Impose missingness on selected predictors
 #
 # MCAR (Missing Completely At Random): Each entry is missing independently of all variables
@@ -39,26 +39,32 @@ impose_mar <- function(X, y, pi, M_risk,
                        seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
   Xmis <- X
+  
   # Fully observed covariates used to drive MAR mechanism
   x1 <- X[, 1]
   x2 <- X[, 2]
   
-  for (j in M_risk) {
-    # Solve for intercept so that E[missing] ≈ pi
-    f_root <- function(alpha0) {
-      pr_obs <- inv_logit(alpha0 + a1 * x1 + a2 * x2 + a3 * y)
-      mean(1 - pr_obs) - pi
-    }
-    
-    alpha0 <- tryCatch(uniroot(f_root, interval = c(-20, 20))$root,
-                       error = function(e) NA_real_)
-    # Fallback if root-finding fails 
-    if (is.na(alpha0)) alpha0 <- 0
-    # Observation probability under MAR
+  # Solve once for intercept so that E[missing] ≈ pi
+  f_root <- function(alpha0) {
     pr_obs <- inv_logit(alpha0 + a1 * x1 + a2 * x2 + a3 * y)
-    # Generate missing indicators
+    mean(1 - pr_obs) - pi
+  }
+  
+  alpha0 <- tryCatch(
+    uniroot(f_root, interval = c(-20, 20))$root,
+    error = function(e) NA_real_
+  )
+  
+  if (is.na(alpha0)) alpha0 <- 0
+  
+  # Shared observation probability under MAR
+  pr_obs <- inv_logit(alpha0 + a1 * x1 + a2 * x2 + a3 * y)
+  
+  # For each at-risk predictor, independently generate missingness
+  for (j in M_risk) {
     miss_idx <- runif(length(y)) > pr_obs
     Xmis[miss_idx, j] <- NA
   }
+  
   Xmis
 }

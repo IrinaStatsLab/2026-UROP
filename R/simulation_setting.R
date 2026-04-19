@@ -1,5 +1,5 @@
 
-# simulation/R/simulation_setting.R
+# R/simulation_setting.R
 
 # Install Missing Packages and Load All Required Packages
 ## Notes on key packages:
@@ -9,13 +9,11 @@
 ## - dplyr: result wrangling (bind_rows, group_by, summarize, etc.)
 ## - foreach + doParallel: parallel simulation replications
 ## - doRNG:guarantees reproducible random number streams when running simulations in parallel.
-## - ggplot2: data visualization
 
-pkgs <- c("MASS", "mice", "glmnet", "dplyr", "foreach", "doParallel", "doRNG", "ggplot2")
+pkgs <- c("MASS", "mice", "glmnet", "dplyr", "foreach", "doParallel", "doRNG")
 for (pkg in pkgs) {
   if (!requireNamespace(pkg, quietly = TRUE)) install.packages(pkg)
 }
-library(ggplot2)
 library(MASS) 
 library(mice)
 library(glmnet) 
@@ -35,7 +33,7 @@ beta_grid <- c("sparse")
 mech_grid <- c("MAR")
 
 # Varied Scenario grids
-rho_grid <- c(0.2, 0.5, 0.8) # Autoregression correlation strength among predictors
+rho_grid <- c(0.2, 0.5, 0.8) # collinearity levels
 pi_grid  <- c(0.2, 0.5, 0.8) # missingness proportion among M_risk variables
 n_grid   <- c(500, 1000) # sample size
 
@@ -43,7 +41,7 @@ n_grid   <- c(500, 1000) # sample size
 s <- 10                         # number of nonzero coefficients in sparse setting
 signal <- 1.0                   # coefficient magnitude / signal strength
 sigma_eps <- 1.0                # noise SD in outcome model
-lambda_fixed <- 1.0             # Ridge penalty 
+lambda_mode <- "complete_data_fixed"
 
 ## Feature selection settings
 perm_m <- 30                     # permutations per replicate (null max|beta|)

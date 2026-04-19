@@ -1,5 +1,5 @@
 
-# simulation/R/data_generation.R
+# R/data_generation.R
 # Contains: block autoregression covariance construction, true coefficient generation, and data generation.
 
 ## Logistic inverse function (Used in MAR missingness later)

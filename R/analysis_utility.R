@@ -1,5 +1,5 @@
 
-# simulation/R/analysis_utility.R
+# R/analysis_utility.R
 # Contains: ridge regression fit, MSE metrics, selection stability diagnostics, Mice wrapper
 
 ## Fit Ridge Regression Model with a Fixed Penalty (lambda)
@@ -107,4 +107,19 @@ run_mice_pmm <- function(df, m, seed) {
     mice::mice(df, m = m, method = "pmm", printFlag = FALSE, seed = seed),
     error = function(e) NULL
   )
+}
+
+## Wrapper for selecting lambda
+select_ridge_lambda_cv <- function(X, y, seed = NULL, nfolds = 5) {
+  if (!is.null(seed)) set.seed(seed)
+  
+  cv_fit <- glmnet::cv.glmnet(
+    x = as.matrix(X),
+    y = as.numeric(y),
+    alpha = 0,
+    nfolds = nfolds,
+    standardize = TRUE
+  )
+  
+  as.numeric(cv_fit$lambda.min)
 }
