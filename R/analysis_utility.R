@@ -103,10 +103,23 @@ ridge_select_perm_threshold <- function(X, y, lambda_fixed,
 ## Returns: mice::mids object if successful; otherwise NULL
 
 run_mice_pmm <- function(df, m, seed) {
-  tryCatch(
-    mice::mice(df, m = m, method = "pmm", printFlag = FALSE, seed = seed),
-    error = function(e) NULL
-  )
+  tryCatch({
+    ini <- mice::mice(df, m = 1, maxit = 0, printFlag = FALSE)
+    method <- ini$method
+    pred   <- ini$predictorMatrix
+    method["y"] <- ""
+    method[setdiff(names(df), "y")] <- "pmm"
+    pred[, "y"] <- 1
+    pred["y", ] <- 0
+    mice::mice(
+      df,
+      m = m,
+      method = method,
+      predictorMatrix = pred,
+      printFlag = FALSE,
+      seed = seed
+    )
+  }, error = function(e) NULL)
 }
 
 ## Wrapper for selecting lambda
