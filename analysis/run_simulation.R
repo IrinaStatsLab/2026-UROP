@@ -63,33 +63,31 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
     "m_imp", "perm_m", "sel_alpha"
   )
   
-  for (scen in seq_len(nrow(scenarios))) {
-    sc <- scenarios[scen, ]
+  for (j in seq_len(m_imp)) {
+    df_j <- tryCatch(mice::complete(imp, action = j), error = function(e) NULL)
+    if (is.null(df_j)) next
     
-    cat("\nScenario", scen, "/", nrow(scenarios), "\n")
-    flush.console()
+    Xj <- as.matrix(df_j[, paste0("X", seq_len(p)), drop = FALSE])
+    yj <- as.numeric(df_j$y)
+    colnames(Xj) <- paste0("X", seq_len(p))
+  
+    if (anyNA(Xj) || anyNA(yj)) next
     
-    res <- foreach::foreach(
-      r = seq_len(R_reps),
-      .combine = dplyr::bind_rows,
-      .packages = c("MASS", "mice", "glmnet", "dplyr", "doRNG"),
-      .export = c(export_objs, export_globals)
-    ) %dopar% {
-      run_one_replicate(
-        rho = sc$rho,
-        pi = sc$pi,
-        beta_type = sc$beta_type,
-        mechanism = sc$mechanism,
-        n = sc$n,
-        b = b, K = K, s = s, signal = signal, sigma_eps = sigma_eps,
-        M_risk = M_risk,
-        lambda_mode = lambda_mode,
-        m_imp = m_imp,
-        perm_m = perm_m,
-        sel_alpha = sel_alpha,
-        seed = seed0 + 100000 * scen + r
-      )
-    }
+    ## each imputed training set gets its own CV lambda
+    lambda_j <- select_ridge_lambda_cv(Xj, yj, seed = seed + 40000 + j)
+    lambda_imp[j] <- lambda_j
+    
+    fit_j <- fit_ridge_fixed_lambda(Xj, yj, lambda_j)
+    
+    ## test-set MSE for pool-MSE strategy
+    yhat_j_test <- predict_ridge(fit_j, X_test)
+    mse_imp_test[j] <- mse(y_test, yhat_j_test)
+    
+    ## store coefficients for coefficient-pooling strategies
+    beta_j <- coef_ridge(fit_j)
+    beta_imp_mat[, j] <- beta_j[paste0("X", seq_len(p))]
+    intercept_imp[j] <- intercept_ridge(fit_j)
+  }
     
     results_all[[scen]] <- res
   }
