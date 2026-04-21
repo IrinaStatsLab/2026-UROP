@@ -164,5 +164,5 @@ write.csv(results_table, "output/results_table.csv", row.names = FALSE)
 saveRDS(replicate_results, "output/rds/replicate_results.rds")
 
 cat("\n--- DONE. Files saved: ---\n")
-cat("Summary table: output/results_table.csv\n")
+cat("Summary table: output/tables/results_table.csv\n")
 cat("Replicate-level data: output/rds/replicate_results.rds\n")

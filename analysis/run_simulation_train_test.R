@@ -162,5 +162,5 @@ saveRDS(replicate_results_train_test,
         "output/rds/replicate_results_train_test.rds")
 
 cat("\n--- DONE. Files saved: ---\n")
-cat("Summary table: output/results_table_train_test.csv\n")
+cat("Summary table: output/tables/results_table_train_test.csv\n")
 cat("Replicate-level data: output/rds/replicate_results_train_test.rds\n")
