@@ -59,7 +59,8 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
   
   export_globals <- c(
     "b", "K", "s", "signal", "sigma_eps",
-    "M_risk", "lambda_mode", "m_imp", "perm_m", "sel_alpha"
+    "M_risk", "lambda_mode", "lambda_fixed_value",
+    "m_imp", "perm_m", "sel_alpha"
   )
   
   for (scen in seq_len(nrow(scenarios))) {

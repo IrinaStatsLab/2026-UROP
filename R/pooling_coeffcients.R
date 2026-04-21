@@ -15,7 +15,7 @@ pool_beta_mean <- function(beta_mat) {
 #   - columns = imputations
 # returns:
 #   - pooled coefficient vector of length p
-pool_beta_svd <- function(beta_mat) {
+pool_beta_svd_weighted_signed <- function(beta_mat) {
   beta_mat <- as.matrix(beta_mat)
   
   if (!is.numeric(beta_mat)) {
@@ -26,28 +26,29 @@ pool_beta_svd <- function(beta_mat) {
     stop("beta_mat must contain at least two imputations (columns).")
   }
   
-  # Singular Value Decomposition: B = UDV^T
+  # SVD: B = UDV^T
   sv <- svd(beta_mat)
   
-  # Dominant right singular vector v1
+  # first right singular vector
   v1 <- sv$v[, 1]
   
-  # Mean coefficient vector across imputations: beta_bar
+  # mean coefficient vector for sign alignment
   beta_bar <- rowMeans(beta_mat)
   
-  # Proposed pooled estimator: beta_pool = B %*% v1
-  beta_pool <- beta_mat %*% v1
+  # signed normalized weights (preserve sign, control scale)
+  w <- v1 / sum(abs(v1))
   
-  # Sign alignment:
-  # if <beta_pool, beta_bar> < 0, flip sign of v1 and beta_pool
+  # weighted pooling
+  beta_pool <- beta_mat %*% w
+  
+  # optional sign alignment for interpretability
   if (drop(crossprod(beta_pool, beta_bar)) < 0) {
-    v1 <- -v1
     beta_pool <- -beta_pool
+    w <- -w
   }
   
   beta_pool <- as.vector(beta_pool)
   
-  # preserve coefficient names if available
   if (!is.null(rownames(beta_mat))) {
     names(beta_pool) <- rownames(beta_mat)
   }

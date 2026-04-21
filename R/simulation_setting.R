@@ -42,6 +42,7 @@ s <- 10                         # number of nonzero coefficients in sparse setti
 signal <- 1.0                   # coefficient magnitude / signal strength
 sigma_eps <- 1.0                # noise SD in outcome model
 lambda_mode <- "complete_data_fixed"
+lambda_fixed_value <- 1.0
 
 ## Feature selection settings
 perm_m <- 30                     # permutations per replicate (null max|beta|)

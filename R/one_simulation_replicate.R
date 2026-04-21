@@ -27,6 +27,8 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
   ## Select ridge penalty according to lambda_mode
   if (lambda_mode == "complete_data_fixed") {
     lambda_use <- select_ridge_lambda_cv(X_full, y, seed = seed + 5000)
+  } else if (lambda_mode == "fixed_constant") {
+    lambda_use <- lambda_fixed_value
   } else {
     stop("Unsupported lambda_mode.")
   }
