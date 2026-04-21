@@ -9,8 +9,9 @@
 ## - dplyr: result wrangling (bind_rows, group_by, summarize, etc.)
 ## - foreach + doParallel: parallel simulation replications
 ## - doRNG:guarantees reproducible random number streams when running simulations in parallel.
-
-pkgs <- c("MASS", "mice", "glmnet", "dplyr", "foreach", "doParallel", "doRNG")
+## - rsample: train test split
+pkgs <- c("MASS", "mice", "glmnet", "dplyr", "foreach", 
+          "doParallel", "doRNG", "rsample")
 for (pkg in pkgs) {
   if (!requireNamespace(pkg, quietly = TRUE)) install.packages(pkg)
 }
@@ -21,6 +22,7 @@ library(dplyr)
 library(foreach) 
 library(doParallel) 
 library(doRNG) 
+library(rsample)
 
 ## Global constants (Protocol)
 b <- 10                         # block size

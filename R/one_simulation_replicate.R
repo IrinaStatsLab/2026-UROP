@@ -134,7 +134,7 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
     beta_mat_good <- beta_imp_mat[, good_beta_cols, drop = FALSE]
     
     beta_pool_mean <- pool_beta_mean(beta_mat_good)
-    beta_pool_svd  <- pool_beta_svd(beta_mat_good)
+    beta_pool_svd_vec <- beta_pool_svd(beta_mat_good)
     
     intercept_pool <- mean(intercept_imp[good_beta_cols], na.rm = TRUE)
 
@@ -151,13 +151,13 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
       mse_beta_pool_mean[j] <- mse(y, yhat_mean)
       
       ## svd pooling
-      yhat_svd <- predict_from_pooled_beta(beta_pool_svd, intercept_pool, Xj)
+      yhat_svd <- predict_from_pooled_beta(beta_pool_svd_vec, intercept_pool, Xj)
       mse_beta_pool_svd[j] <- mse(y, yhat_svd)
     }
     
   } else {
     beta_pool_mean <- rep(NA_real_, p)
-    beta_pool_svd  <- rep(NA_real_, p)
+    beta_pool_svd_vec <- rep(NA_real_, p)
     mse_beta_pool_mean <- rep(NA_real_, m_imp)
     mse_beta_pool_svd  <- rep(NA_real_, m_imp)
   }
@@ -197,7 +197,7 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
   delta_beta_mean <- beta_pool_mean - as.numeric(beta_full[paste0("X", seq_len(p))])
   l2_delta_beta_mean <- sqrt(sum(delta_beta_mean^2, na.rm = TRUE))
   
-  delta_beta_svd <- beta_pool_svd - as.numeric(beta_full[paste0("X", seq_len(p))])
+  delta_beta_svd <- beta_pool_svd_vec - as.numeric(beta_full[paste0("X", seq_len(p))])
   l2_delta_beta_svd <- sqrt(sum(delta_beta_svd^2, na.rm = TRUE))
   
   good_cols <- which(colSums(!is.na(sel_mat)) > 0)

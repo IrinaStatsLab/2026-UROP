@@ -15,7 +15,7 @@ pool_beta_mean <- function(beta_mat) {
 #   - columns = imputations
 # returns:
 #   - pooled coefficient vector of length p
-pool_beta_svd_weighted_signed <- function(beta_mat) {
+beta_pool_svd <- function(beta_mat) {
   beta_mat <- as.matrix(beta_mat)
   
   if (!is.numeric(beta_mat)) {
