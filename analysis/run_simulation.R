@@ -160,7 +160,7 @@ replicate_results <- sim_out$replicate
 if (!dir.exists("output")) dir.create("output", recursive = TRUE)
 if (!dir.exists("output/rds")) dir.create("output/rds", recursive = TRUE)
 
-write.csv(results_table, "output/results_table.csv", row.names = FALSE)
+write.csv(results_table, "output/tables/results_table.csv", row.names = FALSE)
 saveRDS(replicate_results, "output/rds/replicate_results.rds")
 
 cat("\n--- DONE. Files saved: ---\n")
