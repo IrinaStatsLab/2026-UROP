@@ -90,7 +90,6 @@ run_one_replicate_train_test <- function(rho, pi, beta_type, mechanism,
     Xj <- as.matrix(df_j[, paste0("X", seq_len(p)), drop = FALSE])
     yj <- as.numeric(df_j$y)
     colnames(Xj) <- paste0("X", seq_len(p))
-    if (anyNA(Xj) || anyNA(yj)) next
     
     ## each imputed training set gets its own CV lambda
     lambda_j <- select_ridge_lambda_cv(Xj, yj, seed = seed + 40000 + j)
