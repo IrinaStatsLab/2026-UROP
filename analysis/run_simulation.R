@@ -90,7 +90,6 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
         seed = seed0 + 100000 * scen + r
       )
     }
-    
     results_all[[scen]] <- res
   }
   
