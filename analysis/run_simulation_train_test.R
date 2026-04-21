@@ -155,7 +155,7 @@ if (!dir.exists("output")) dir.create("output", recursive = TRUE)
 if (!dir.exists("output/rds")) dir.create("output/rds", recursive = TRUE)
 
 write.csv(results_table_train_test,
-          "output/results_table_train_test.csv",
+          "output/tables/results_table_train_test.csv",
           row.names = FALSE)
 
 saveRDS(replicate_results_train_test,
