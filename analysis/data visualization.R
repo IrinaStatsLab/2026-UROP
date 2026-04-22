@@ -1,6 +1,4 @@
 
-# simulation/R/data_visualization.R
-
 library(dplyr)
 library(ggplot2)
 library(tidyr)
@@ -20,8 +18,8 @@ read_one <- function(file, beta_type, mechanism, setting, lambda_mode) {
     mutate(
       beta_type   = beta_type,
       mechanism   = mechanism,
-      setting     = setting,      # baseline or train_test
-      lambda_mode = lambda_mode   # cv / fixed_1 / train_test_cv
+      setting     = setting,
+      lambda_mode = lambda_mode
     )
 }
 
@@ -55,12 +53,7 @@ save_plot <- function(p, filename, width = 12, height = 8) {
 }
 
 # =========================================================
-# 1) Read baseline results (NO train-test)
-#    Purpose:
-#    - estimate target quantity
-#    - study factors affecting estimation
-#    - compare pooling strategies
-#    - compare CV lambda vs fixed lambda = 1
+# 1) Read baseline results
 # =========================================================
 
 baseline_cv_df <- bind_rows(
@@ -89,7 +82,6 @@ baseline_fixed_df <- bind_rows(
 
 baseline_all_df <- bind_rows(baseline_cv_df, baseline_fixed_df)
 
-# Long format for pooling strategy comparison
 baseline_long <- baseline_all_df %>%
   select(
     n, rho, pi, beta_type, mechanism, lambda_mode,
@@ -118,8 +110,6 @@ baseline_long <- baseline_all_df %>%
 
 # =========================================================
 # 2) Read train-test results
-#    Purpose:
-#    - compare out-of-sample predictive performance
 # =========================================================
 
 train_test_df <- bind_rows(
@@ -156,19 +146,18 @@ train_test_long <- train_test_df %>%
   )
 
 # =========================================================
-# Part 1: Baseline estimate-level figures
-# =========================================================
-# =========================================================
-# Figure 0: Histogram of R (baseline, CV lambda)
-# Purpose: overall distribution of estimator
+# Part 1: Baseline estimation-level figures
 # =========================================================
 
-ratios <- baseline_cv_df$ratio_R
-ratios <- ratios[is.finite(ratios)]
+# ---------------------------------------------------------
+# Figure 0a: Histogram of R for Pool MSE with CV lambda
+# ---------------------------------------------------------
 
-sd_R <- sd(ratios, na.rm = TRUE)
+ratios_cv <- baseline_cv_df$ratio_R
+ratios_cv <- ratios_cv[is.finite(ratios_cv)]
+sd_R_cv <- sd(ratios_cv, na.rm = TRUE)
 
-p0 <- ggplot(data.frame(R = ratios), aes(x = R)) +
+p0a <- ggplot(data.frame(R = ratios_cv), aes(x = R)) +
   geom_histogram(
     aes(y = after_stat(density)),
     bins = 30,
@@ -177,63 +166,109 @@ p0 <- ggplot(data.frame(R = ratios), aes(x = R)) +
   ) +
   stat_function(
     fun = dnorm,
-    args = list(mean = 1, sd = sd_R),
+    args = list(mean = 1, sd = sd_R_cv),
     color = "red",
     linewidth = 1.2
   ) +
   geom_vline(xintercept = 1, linetype = "dashed") +
   labs(
     title = "Overall Distribution of Relative MSE (R)",
-    subtitle = "Baseline setting with CV-selected lambda",
+    subtitle = "Distribution of R for direct MSE pooling; centered around the ideal value R = 1",
     x = "R",
     y = "Density"
   )
 
-print(p0)
-save_plot(p0, "fig0_histogram_R_baseline_cv.png", width = 10, height = 6)
+print(p0a)
+save_plot(p0a, "fig0a_histogram_R_poolMSE_cv.png", width = 10, height = 6)
 
 # ---------------------------------------------------------
-# Figure 1:
-# Main effect of missing proportion (baseline, Pool MSE only)
-# This is for: what factors affect estimation?
+# Figure 0b: Histogram of R for Pool MSE with fixed lambda
 # ---------------------------------------------------------
 
-fig1_df <- baseline_cv_df %>%
-  group_by(n, rho, pi, beta_type, mechanism) %>%
-  summarise(
-    R_mean = mean(ratio_R, na.rm = TRUE),
-    .groups = "drop"
+ratios_fixed <- baseline_fixed_df$ratio_R
+ratios_fixed <- ratios_fixed[is.finite(ratios_fixed)]
+sd_R_fixed <- sd(ratios_fixed, na.rm = TRUE)
+
+p0b <- ggplot(data.frame(R = ratios_fixed), aes(x = R)) +
+  geom_histogram(
+    aes(y = after_stat(density)),
+    bins = 30,
+    fill = "grey80",
+    color = "white"
+  ) +
+  stat_function(
+    fun = dnorm,
+    args = list(mean = 1, sd = sd_R_fixed),
+    color = "red",
+    linewidth = 1.2
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  labs(
+    title = "Overall Distribution of Relative MSE (R)",
+    subtitle = "Effect of fixing lambda: distribution becomes more dispersed compared to CV tuning",
+    x = "R",
+    y = "Density"
   )
 
-p1 <- ggplot(fig1_df, aes(x = pi, y = R_mean, color = rho, group = rho)) +
-  geom_boxplot(
-    data = baseline_cv_df,
-    aes(x = pi, y = ratio_R, group = interaction(pi, rho), fill = rho),
-    inherit.aes = FALSE,
-    alpha = 0.20,
-    position = position_dodge(width = 0.75),
-    outlier.size = 0.6
+print(p0b)
+save_plot(p0b, "fig0b_histogram_R_poolMSE_fixed1.png", width = 10, height = 6)
+
+# ---------------------------------------------------------
+# Figure 0c: Histogram of R for coefficient pooling (mean)
+# ---------------------------------------------------------
+
+ratios_coef_mean <- baseline_cv_df$ratio_R_coef_mean
+ratios_coef_mean <- ratios_coef_mean[is.finite(ratios_coef_mean)]
+sd_R_coef_mean <- sd(ratios_coef_mean, na.rm = TRUE)
+
+p0c <- ggplot(data.frame(R = ratios_coef_mean), aes(x = R)) +
+  geom_histogram(
+    aes(y = after_stat(density)),
+    bins = 30,
+    fill = "grey80",
+    color = "white"
   ) +
-  geom_point(size = 2.2, position = position_dodge(width = 0.75)) +
-  geom_line(linewidth = 0.8, aes(group = rho)) +
-  geom_hline(yintercept = 1, linetype = "dashed") +
-  facet_grid(beta_type + n ~ mechanism) +
+  stat_function(
+    fun = dnorm,
+    args = list(mean = 1, sd = sd_R_coef_mean),
+    color = "red",
+    linewidth = 1.2
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
   labs(
-    title = "Main Effect of Missingness on Relative MSE",
-    subtitle = "Baseline setting, Pool MSE, CV-selected lambda",
+    title = "Distribution of Relative MSE (R)",
+    subtitle = "Coefficient pooling produces estimates more concentrated around R = 1",
+    x = "R",
+    y = "Density"
+  )
+
+print(p0c)
+save_plot(p0c, "fig0c_histogram_R_coefMean_cv.png", width = 10, height = 6)
+
+# ---------------------------------------------------------
+# Figure 1: Main effect of missingness on Pool MSE
+# ---------------------------------------------------------
+
+p1 <- ggplot(
+  baseline_cv_df,
+  aes(x = pi, y = ratio_R, fill = pi)
+) +
+  geom_boxplot(alpha = 0.75, outlier.size = 0.6) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  facet_grid(beta_type + n ~ mechanism + rho) +
+  labs(
+    title = "Effect of Missingness Proportion on Relative MSE",
+    subtitle = "Higher missingness leads to larger deviation from R = 1 and increased variability",
     x = "Missingness proportion (pi)",
-    y = "Mean R",
-    color = "Collinearity (rho)",
-    fill = "Collinearity (rho)"
+    y = "Relative MSE (R)",
+    fill = "pi"
   )
 
 print(p1)
-save_plot(p1, "fig1_main_effect_missingness_baseline_cv.png", width = 13, height = 9)
+save_plot(p1, "fig1_main_effect_missingness_baseline_cv.png", width = 15, height = 9)
 
 # ---------------------------------------------------------
-# Figure 2:
-# Pooling strategy comparison (baseline, CV-selected lambda)
-# Teacher prefers boxplots
+# Figure 2: Pooling strategy comparison under CV lambda
 # ---------------------------------------------------------
 
 baseline_cv_long <- baseline_long %>%
@@ -242,16 +277,18 @@ baseline_cv_long <- baseline_long %>%
 p2 <- ggplot(baseline_cv_long, aes(x = pi, y = R, fill = method)) +
   geom_boxplot(
     alpha = 0.75,
-    position = position_dodge(width = 0.8),
-    outlier.size = 0.7
+    position = position_dodge(width = 0.9),
+    outlier.shape = NA,
+    width = 0.7
   ) +
   geom_hline(yintercept = 1, linetype = "dashed") +
+  coord_cartesian(ylim = c(0.5, 1.3)) +
   facet_grid(beta_type + rho ~ mechanism) +
   labs(
     title = "Distribution of Relative MSE by Pooling Strategy",
-    subtitle = "Baseline setting with CV-selected lambda",
+    subtitle = "Coefficient pooling yields estimates closer to R = 1, especially at high missingness",
     x = "Missingness proportion (pi)",
-    y = "Relative MSE (R)",
+    y = "R",
     fill = "Method"
   )
 
@@ -259,8 +296,32 @@ print(p2)
 save_plot(p2, "fig2_pooling_strategy_baseline_cv_boxplot.png", width = 13, height = 9)
 
 # ---------------------------------------------------------
-# Figure 3:
-# Same comparison but fixed lambda = 1
+# Figure 2b: Same comparison, separated by pi
+# extra figure for clearer method comparison
+# ---------------------------------------------------------
+
+p2b <- ggplot(baseline_cv_long, aes(x = method, y = R, fill = method)) +
+  geom_boxplot(
+    alpha = 0.75,
+    outlier.shape = NA,
+    width = 0.7
+  ) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  coord_cartesian(ylim = c(0.5, 1.3)) +
+  facet_grid(beta_type + rho + pi ~ mechanism) +
+  labs(
+    title = "Relative MSE by Pooling Strategy, Separated by Missingness Level",
+    subtitle = "Separating panels by pi makes differences among pooling methods easier to compare",
+    x = "Pooling strategy",
+    y = "R",
+    fill = "Method"
+  )
+
+print(p2b)
+save_plot(p2b, "fig2b_pooling_strategy_baseline_cv_by_pi.png", width = 13, height = 12)
+
+# ---------------------------------------------------------
+# Figure 3: Pooling strategy comparison under fixed lambda
 # ---------------------------------------------------------
 
 baseline_fixed_long <- baseline_long %>%
@@ -270,13 +331,15 @@ p3 <- ggplot(baseline_fixed_long, aes(x = pi, y = R, fill = method)) +
   geom_boxplot(
     alpha = 0.75,
     position = position_dodge(width = 0.8),
-    outlier.size = 0.7
+    outlier.shape = NA,
+    width = 0.7
   ) +
   geom_hline(yintercept = 1, linetype = "dashed") +
+  coord_cartesian(ylim = c(0.6, 1.3)) +
   facet_grid(beta_type + rho ~ mechanism) +
   labs(
     title = "Distribution of Relative MSE by Pooling Strategy",
-    subtitle = "Baseline setting with fixed lambda = 1",
+    subtitle = "Without tuning, all methods degrade, but coefficient pooling remains more stable",
     x = "Missingness proportion (pi)",
     y = "Relative MSE (R)",
     fill = "Method"
@@ -286,22 +349,21 @@ print(p3)
 save_plot(p3, "fig3_pooling_strategy_baseline_fixed1_boxplot.png", width = 13, height = 9)
 
 # ---------------------------------------------------------
-# Figure 4:
-# Direct lambda comparison
-# Compare CV-selected lambda vs fixed lambda = 1
+# Figure 4: Sensitivity to lambda choice
 # ---------------------------------------------------------
 
 p4 <- ggplot(baseline_long, aes(x = pi, y = R, fill = method)) +
   geom_boxplot(
     alpha = 0.75,
     position = position_dodge(width = 0.8),
-    outlier.size = 0.6
+    outlier.shape = NA,
+    width = 0.7
   ) +
   geom_hline(yintercept = 1, linetype = "dashed") +
   facet_grid(beta_type + rho ~ mechanism + lambda_mode) +
   labs(
     title = "Sensitivity to Lambda Choice",
-    subtitle = "Comparison of CV-selected lambda and fixed lambda = 1",
+    subtitle = "Comparing CV-selected and fixed lambda shows sensitivity of estimation to tuning",
     x = "Missingness proportion (pi)",
     y = "Relative MSE (R)",
     fill = "Method"
@@ -311,70 +373,97 @@ print(p4)
 save_plot(p4, "fig4_lambda_sensitivity_boxplot.png", width = 16, height = 9)
 
 # ---------------------------------------------------------
-# Figure 5:
-# Method gap plot
-# Positive = coefficient pooling better than direct Pool MSE
+# Figure 5: Gap analysis (baseline)
 # ---------------------------------------------------------
 
 gap_df <- baseline_cv_df %>%
   mutate(
-    gap_mean = ratio_R - ratio_R_coef_mean,
-    gap_svd  = ratio_R - ratio_R_coef_svd
-  ) %>%
-  select(n, rho, pi, beta_type, mechanism, gap_mean, gap_svd) %>%
-  pivot_longer(
-    cols = c(gap_mean, gap_svd),
-    names_to = "comparison",
-    values_to = "gap"
-  ) %>%
-  mutate(
-    comparison = recode(
-      comparison,
-      gap_mean = "Pool MSE - Pooled Coef (Mean)",
-      gap_svd  = "Pool MSE - Pooled Coef (SVD)"
-    )
+    gap_poolmse_vs_mean = abs(ratio_R - 1) - abs(ratio_R_coef_mean - 1),
+    gap_poolmse_vs_svd  = abs(ratio_R - 1) - abs(ratio_R_coef_svd - 1),
+    gap_mean_vs_svd     = abs(ratio_R_coef_mean - 1) - abs(ratio_R_coef_svd - 1)
   ) %>%
   clean_common()
 
-p5 <- ggplot(gap_df, aes(x = pi, y = gap, fill = comparison)) +
+p5a <- ggplot(gap_df, aes(x = pi, y = gap_poolmse_vs_mean)) +
   geom_boxplot(
+    fill = "steelblue",
     alpha = 0.75,
-    position = position_dodge(width = 0.8),
-    outlier.size = 0.7
+    outlier.shape = NA,
+    width = 0.7
   ) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   facet_grid(beta_type + rho ~ mechanism) +
   labs(
-    title = "Gap Relative to Direct Pooling of MSE",
-    subtitle = "Positive values indicate coefficient pooling gives smaller R",
+    title = "Gap: Direct Pooling of MSE vs Coefficient Pooling (Mean)",
+    subtitle = "Positive values indicate coefficient pooling is closer to R = 1 than direct MSE pooling",
     x = "Missingness proportion (pi)",
-    y = "Gap",
-    fill = "Comparison"
+    y = "Gap (distance to R = 1)"
   )
 
-print(p5)
-save_plot(p5, "fig5_gap_vs_poolmse_boxplot.png", width = 13, height = 9)
+print(p5a)
+save_plot(p5a, "fig5a_gap_poolmse_vs_mean.png", width = 13, height = 9)
+
+p5b <- ggplot(gap_df, aes(x = pi, y = gap_poolmse_vs_svd)) +
+  geom_boxplot(
+    fill = "darkorange",
+    alpha = 0.75,
+    outlier.shape = NA,
+    width = 0.7
+  ) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_cartesian(ylim = c(-0.5, 0.5)) +
+  facet_grid(beta_type + rho ~ mechanism) +
+  labs(
+    title = "Gap: Direct Pooling of MSE vs Coefficient Pooling (SVD)",
+    subtitle = "Positive values indicate SVD pooling is closer to R = 1 than direct MSE pooling",
+    x = "Missingness proportion (pi)",
+    y = "Gap (distance to R = 1)"
+  )
+
+print(p5b)
+save_plot(p5b, "fig5b_gap_poolmse_vs_svd.png", width = 13, height = 9)
+
+p5c <- ggplot(gap_df, aes(x = pi, y = gap_mean_vs_svd)) +
+  geom_boxplot(
+    fill = "mediumpurple",
+    alpha = 0.75,
+    outlier.shape = NA,
+    width = 0.7
+  ) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_cartesian(ylim = c(-0.03, 0.01)) +
+  facet_grid(beta_type + rho ~ mechanism) +
+  labs(
+    title = "Gap: Coefficient Pooling (Mean) vs Coefficient Pooling (SVD)",
+    subtitle = "Values close to zero indicate mean and SVD pooling perform similarly",
+    x = "Missingness proportion (pi)",
+    y = "Gap (distance to R = 1)"
+  )
+
+print(p5c)
+save_plot(p5c, "fig5c_gap_mean_vs_svd.png", width = 13, height = 9)
 
 # =========================================================
 # Part 2: Train-test figures
 # =========================================================
 
 # ---------------------------------------------------------
-# Figure 6:
-# Out-of-sample comparison of pooling strategies
+# Figure 6: Out-of-sample comparison
 # ---------------------------------------------------------
 
 p6 <- ggplot(train_test_long, aes(x = pi, y = R, fill = method)) +
   geom_boxplot(
     alpha = 0.75,
     position = position_dodge(width = 0.8),
-    outlier.size = 0.7
+    outlier.shape = NA,
+    width = 0.7
   ) +
   geom_hline(yintercept = 1, linetype = "dashed") +
+  coord_cartesian(ylim = c(1, 6)) +
   facet_grid(beta_type + rho ~ mechanism) +
   labs(
     title = "Held-out Test Relative MSE by Pooling Strategy",
-    subtitle = "Train-test split setting",
+    subtitle = "Out-of-sample performance shows how pooling strategies generalize under missingness",
     x = "Missingness proportion (pi)",
     y = "Test Relative MSE (R)",
     fill = "Method"
@@ -384,102 +473,176 @@ print(p6)
 save_plot(p6, "fig6_train_test_pooling_strategy_boxplot.png", width = 13, height = 9)
 
 # ---------------------------------------------------------
-# Figure 7:
-# Out-of-sample method gap
+# Figure 6b: Distribution of CV-selected lambda in train-test setting
+# ---------------------------------------------------------
+
+lambda_plot_df <- train_test_df %>%
+  select(
+    n, rho, pi, beta_type, mechanism,
+    lambda_full, lambda_imp_mean, lambda_imp_sd
+  ) %>%
+  clean_common()
+
+p6b <- ggplot(lambda_plot_df, aes(x = pi, y = lambda_imp_mean)) +
+  geom_point(size = 2.2) +
+  geom_errorbar(
+    aes(
+      ymin = pmax(lambda_imp_mean - lambda_imp_sd, 0),
+      ymax = lambda_imp_mean + lambda_imp_sd
+    ),
+    width = 0.08
+  ) +
+  facet_grid(beta_type + rho ~ mechanism) +
+  labs(
+    title = "CV-selected Lambda in the Train-test Setting",
+    subtitle = "Points show the mean selected lambda across imputed datasets; bars show ±1 SD",
+    x = "Missingness proportion (pi)",
+    y = "Selected lambda"
+  )
+
+print(p6b)
+save_plot(p6b, "fig6b_train_test_lambda_mean_sd.png", width = 13, height = 9)
+
+# ---------------------------------------------------------
+# Figure 6c: Complete-data vs imputed-data selected lambda
+# ---------------------------------------------------------
+
+lambda_compare_df <- train_test_df %>%
+  select(
+    n, rho, pi, beta_type, mechanism,
+    lambda_full, lambda_imp_mean
+  ) %>%
+  pivot_longer(
+    cols = c(lambda_full, lambda_imp_mean),
+    names_to = "lambda_type",
+    values_to = "lambda"
+  ) %>%
+  mutate(
+    lambda_type = recode(
+      lambda_type,
+      lambda_full = "Complete-data benchmark",
+      lambda_imp_mean = "Mean across imputed datasets"
+    )
+  ) %>%
+  clean_common()
+
+p6c <- ggplot(lambda_compare_df, aes(x = pi, y = lambda, fill = lambda_type)) +
+  geom_boxplot(
+    alpha = 0.75,
+    position = position_dodge(width = 0.8),
+    outlier.shape = NA,
+    width = 0.7
+  ) +
+  facet_grid(beta_type + rho ~ mechanism) +
+  labs(
+    title = "Selected Lambda: Complete-data vs Imputed-data Analyses",
+    subtitle = "Comparing the benchmark lambda with the average lambda selected across imputations",
+    x = "Missingness proportion (pi)",
+    y = "Selected lambda",
+    fill = "Lambda source"
+  )
+
+print(p6c)
+save_plot(p6c, "fig6c_train_test_lambda_compare.png", width = 13, height = 9)
+# ---------------------------------------------------------
+# Figure 7: Gap analysis (train-test)
 # ---------------------------------------------------------
 
 train_gap_df <- train_test_df %>%
   mutate(
-    gap_mean = ratio_R_test - ratio_R_coef_mean_test,
-    gap_svd  = ratio_R_test - ratio_R_coef_svd_test
-  ) %>%
-  select(n, rho, pi, beta_type, mechanism, gap_mean, gap_svd) %>%
-  pivot_longer(
-    cols = c(gap_mean, gap_svd),
-    names_to = "comparison",
-    values_to = "gap"
-  ) %>%
-  mutate(
-    comparison = recode(
-      comparison,
-      gap_mean = "Pool MSE - Pooled Coef (Mean)",
-      gap_svd  = "Pool MSE - Pooled Coef (SVD)"
-    )
+    gap_poolmse_vs_mean = abs(ratio_R_test - 1) - abs(ratio_R_coef_mean_test - 1),
+    gap_poolmse_vs_svd  = abs(ratio_R_test - 1) - abs(ratio_R_coef_svd_test - 1),
+    gap_mean_vs_svd     = abs(ratio_R_coef_mean_test - 1) - abs(ratio_R_coef_svd_test - 1)
   ) %>%
   clean_common()
 
-p7 <- ggplot(train_gap_df, aes(x = pi, y = gap, fill = comparison)) +
+p7a <- ggplot(train_gap_df, aes(x = pi, y = gap_poolmse_vs_mean)) +
   geom_boxplot(
+    fill = "steelblue",
     alpha = 0.75,
-    position = position_dodge(width = 0.8),
-    outlier.size = 0.7
+    outlier.shape = NA,
+    width = 0.7
   ) +
   geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_cartesian(ylim = c(0, 4)) +
   facet_grid(beta_type + rho ~ mechanism) +
   labs(
-    title = "Held-out Test Gap Relative to Direct Pooling of MSE",
-    subtitle = "Positive values indicate coefficient pooling gives smaller test R",
+    title = "Held-out Test Gap: Direct Pooling of MSE vs Coefficient Pooling (Mean)",
+    subtitle = "Positive values indicate coefficient pooling achieves lower test error",
     x = "Missingness proportion (pi)",
-    y = "Gap on test set",
-    fill = "Comparison"
+    y = "Gap (distance to R = 1)"
   )
 
-print(p7)
-save_plot(p7, "fig7_train_test_gap_boxplot.png", width = 13, height = 9)
+print(p7a)
+save_plot(p7a, "fig7a_train_test_gap_poolmse_vs_mean.png", width = 13, height = 9)
 
-# =========================================================
-# Optional appendix figure:
-# Variance / stability
-# =========================================================
-
-var_plot_df <- baseline_cv_df %>%
-  select(
-    n, rho, pi, beta_type, mechanism,
-    ratio_R_var,
-    ratio_R_coef_mean_var,
-    ratio_R_coef_svd_var
-  ) %>%
-  pivot_longer(
-    cols = c(ratio_R_var, ratio_R_coef_mean_var, ratio_R_coef_svd_var),
-    names_to = "method",
-    values_to = "R_var"
-  ) %>%
-  mutate(
-    method = recode(
-      method,
-      ratio_R_var = "Pool MSE",
-      ratio_R_coef_mean_var = "Pooled Coefficient (Mean)",
-      ratio_R_coef_svd_var = "Pooled Coefficient (SVD)"
-    )
-  ) %>%
-  clean_common()
-
-p8 <- ggplot(var_plot_df, aes(x = pi, y = R_var, fill = method)) +
+p7b <- ggplot(train_gap_df, aes(x = pi, y = gap_poolmse_vs_svd)) +
   geom_boxplot(
+    fill = "darkorange",
     alpha = 0.75,
-    position = position_dodge(width = 0.8),
-    outlier.size = 0.7
+    outlier.shape = NA,
+    width = 0.7
   ) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_cartesian(ylim = c(0, 3.5)) +
   facet_grid(beta_type + rho ~ mechanism) +
   labs(
-    title = "Stability of Relative MSE by Pooling Strategy",
-    subtitle = "Baseline setting with CV-selected lambda",
+    title = "Held-out Test Gap: Direct Pooling of MSE vs Coefficient Pooling (SVD)",
+    subtitle = "Positive values indicate SVD pooling achieves lower test error",
     x = "Missingness proportion (pi)",
-    y = "Variance of R",
-    fill = "Method"
+    y = "Gap (distance to R = 1)"
   )
 
-print(p8)
-save_plot(p8, "fig8_stability_variance_boxplot.png", width = 13, height = 9)
+print(p7b)
+save_plot(p7b, "fig7b_train_test_gap_poolmse_vs_svd.png", width = 13, height = 9)
+
+p7c <- ggplot(train_gap_df, aes(x = pi, y = gap_mean_vs_svd)) +
+  geom_boxplot(
+    fill = "mediumpurple",
+    alpha = 0.75,
+    outlier.shape = NA,
+    width = 0.7
+  ) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_cartesian(ylim = c(-1, 0)) +
+  facet_grid(beta_type + rho ~ mechanism) +
+  labs(
+    title = "Held-out Test Gap: Coefficient Pooling (Mean) vs Coefficient Pooling (SVD)",
+    subtitle = "Near-zero values indicate little difference between mean and SVD pooling on test data",
+    x = "Missingness proportion (pi)",
+    y = "Gap (distance to R = 1)"
+  )
+
+print(p7c)
+save_plot(p7c, "fig7c_train_test_gap_mean_vs_svd.png", width = 13, height = 9)
 
 # =========================================================
 # Console summary
 # =========================================================
 
-cat("\nAll figures saved to:", dir_fig, "\n")
-cat("Main recommended figures:\n")
-cat("  fig0_histogram_R_baseline_cv.png\n")
+cat("\nAll figures saved to:", dir_fig, "\n\n")
+
+cat("Figure 0 (distribution):\n")
+cat("  fig0a_histogram_R_poolMSE_cv.png\n")
+cat("  fig0b_histogram_R_poolMSE_fixed1.png\n")
+cat("  fig0c_histogram_R_coefMean_cv.png\n\n")
+
+cat("Baseline (estimation-level):\n")
 cat("  fig1_main_effect_missingness_baseline_cv.png\n")
 cat("  fig2_pooling_strategy_baseline_cv_boxplot.png\n")
-cat("  fig4_lambda_sensitivity_boxplot.png\n")
-cat("  fig6_train_test_pooling_strategy_boxplot.png\n\n")
+cat("  fig2b_pooling_strategy_baseline_cv_by_pi.png\n")
+cat("  fig3_pooling_strategy_baseline_fixed1_boxplot.png\n")
+cat("  fig4_lambda_sensitivity_boxplot.png\n\n")
+
+cat("Gap analysis (baseline):\n")
+cat("  fig5a_gap_poolmse_vs_mean.png\n")
+cat("  fig5b_gap_poolmse_vs_svd.png\n")
+cat("  fig5c_gap_mean_vs_svd.png\n\n")
+
+cat("Train-test (out-of-sample):\n")
+cat("  fig6_train_test_pooling_strategy_boxplot.png\n")
+cat("  fig7a_train_test_gap_poolmse_vs_mean.png\n")
+cat("  fig7b_train_test_gap_poolmse_vs_svd.png\n")
+cat("  fig6b_train_test_lambda_mean_sd.png\n")
+cat("  fig6c_train_test_lambda_compare.png\n")
+cat("  fig7c_train_test_gap_mean_vs_svd.png\n\n")
