@@ -31,8 +31,8 @@ p <- b * K                      # total number of predictors (50)
 M_risk <- 11:30                 # 20 predictors can be missing; others are anchors
 
 # Fixed Scenario grids
-beta_grid <- c("sparse")
-mech_grid <- c("MAR")
+beta_grid <- c("dense")        #"sparse" / "dense"
+mech_grid <- c("MAR")           #"MAR" / "MCAR"
 
 # Varied Scenario grids
 rho_grid <- c(0.2, 0.5, 0.8) # collinearity levels
@@ -43,7 +43,7 @@ n_grid   <- c(500, 1000) # sample size
 s <- 10                         # number of nonzero coefficients in sparse setting
 signal <- 1.0                   # coefficient magnitude / signal strength
 sigma_eps <- 1.0                # noise SD in outcome model
-lambda_mode <- "complete_data_fixed"
+lambda_mode <- "fixed_constant" #"complete_data_fixed" / "fixed_constant"
 lambda_fixed_value <- 1.0
 
 ## Feature selection settings
