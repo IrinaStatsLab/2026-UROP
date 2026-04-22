@@ -248,22 +248,24 @@ save_plot(p0c, "fig0c_histogram_R_coefMean_cv.png", width = 10, height = 6)
 # ---------------------------------------------------------
 # Figure 1: Main effect of missingness on Pool MSE
 # ---------------------------------------------------------
-
 p1 <- ggplot(
   baseline_cv_df,
-  aes(x = pi, y = ratio_R, fill = pi)
+  aes(x = pi, y = ratio_R)
 ) +
-  geom_boxplot(alpha = 0.75, outlier.size = 0.6) +
+  geom_boxplot(
+    fill = "steelblue",
+    color = "black",
+    alpha = 0.8,
+    outlier.size = 0.6
+  ) +
   geom_hline(yintercept = 1, linetype = "dashed") +
   facet_grid(beta_type + n ~ mechanism + rho) +
   labs(
     title = "Effect of Missingness Proportion on Relative MSE",
     subtitle = "Higher missingness leads to larger deviation from R = 1 and increased variability",
     x = "Missingness proportion (pi)",
-    y = "Relative MSE (R)",
-    fill = "pi"
+    y = "Relative MSE (R)"
   )
-
 print(p1)
 save_plot(p1, "fig1_main_effect_missingness_baseline_cv.png", width = 15, height = 9)
 
@@ -294,31 +296,6 @@ p2 <- ggplot(baseline_cv_long, aes(x = pi, y = R, fill = method)) +
 
 print(p2)
 save_plot(p2, "fig2_pooling_strategy_baseline_cv_boxplot.png", width = 13, height = 9)
-
-# ---------------------------------------------------------
-# Figure 2b: Same comparison, separated by pi
-# extra figure for clearer method comparison
-# ---------------------------------------------------------
-
-p2b <- ggplot(baseline_cv_long, aes(x = method, y = R, fill = method)) +
-  geom_boxplot(
-    alpha = 0.75,
-    outlier.shape = NA,
-    width = 0.7
-  ) +
-  geom_hline(yintercept = 1, linetype = "dashed") +
-  coord_cartesian(ylim = c(0.5, 1.3)) +
-  facet_grid(beta_type + rho + pi ~ mechanism) +
-  labs(
-    title = "Relative MSE by Pooling Strategy, Separated by Missingness Level",
-    subtitle = "Separating panels by pi makes differences among pooling methods easier to compare",
-    x = "Pooling strategy",
-    y = "R",
-    fill = "Method"
-  )
-
-print(p2b)
-save_plot(p2b, "fig2b_pooling_strategy_baseline_cv_by_pi.png", width = 13, height = 12)
 
 # ---------------------------------------------------------
 # Figure 3: Pooling strategy comparison under fixed lambda
@@ -472,46 +449,35 @@ p6 <- ggplot(train_test_long, aes(x = pi, y = R, fill = method)) +
 print(p6)
 save_plot(p6, "fig6_train_test_pooling_strategy_boxplot.png", width = 13, height = 9)
 
-# ---------------------------------------------------------
-# Figure 6b: Distribution of CV-selected lambda in train-test setting
+
+# Figure 6b: Histogram of selected lambda across imputed datasets
 # ---------------------------------------------------------
 
-lambda_plot_df <- train_test_df %>%
-  select(
-    n, rho, pi, beta_type, mechanism,
-    lambda_full, lambda_imp_mean, lambda_imp_sd
-  ) %>%
-  clean_common()
+lambda_imp_vals <- train_test_df$lambda_imp_mean
+lambda_imp_vals <- lambda_imp_vals[is.finite(lambda_imp_vals)]
 
-p6b <- ggplot(lambda_plot_df, aes(x = pi, y = lambda_imp_mean)) +
-  geom_point(size = 2.2) +
-  geom_errorbar(
-    aes(
-      ymin = pmax(lambda_imp_mean - lambda_imp_sd, 0),
-      ymax = lambda_imp_mean + lambda_imp_sd
-    ),
-    width = 0.08
+p6b <- ggplot(data.frame(lambda = lambda_imp_vals), aes(x = lambda)) +
+  geom_histogram(
+    bins = 30,
+    fill = "grey80",
+    color = "white"
   ) +
-  facet_grid(beta_type + rho ~ mechanism) +
   labs(
-    title = "CV-selected Lambda in the Train-test Setting",
-    subtitle = "Points show the mean selected lambda across imputed datasets; bars show ±1 SD",
-    x = "Missingness proportion (pi)",
-    y = "Selected lambda"
+    title = "Distribution of CV-selected Lambda Across Imputed Datasets",
+    subtitle = "Histogram of the mean lambda selected across imputations in the train-test setting",
+    x = "Selected lambda",
+    y = "Count"
   )
 
 print(p6b)
-save_plot(p6b, "fig6b_train_test_lambda_mean_sd.png", width = 13, height = 9)
+save_plot(p6b, "fig6b_train_test_lambda_histogram.png", width = 10, height = 6)
 
 # ---------------------------------------------------------
-# Figure 6c: Complete-data vs imputed-data selected lambda
+# Figure 6c: Overlaid histogram of benchmark vs imputed-data lambda
 # ---------------------------------------------------------
 
-lambda_compare_df <- train_test_df %>%
-  select(
-    n, rho, pi, beta_type, mechanism,
-    lambda_full, lambda_imp_mean
-  ) %>%
+lambda_compare_hist_df <- train_test_df %>%
+  select(lambda_full, lambda_imp_mean) %>%
   pivot_longer(
     cols = c(lambda_full, lambda_imp_mean),
     names_to = "lambda_type",
@@ -524,26 +490,24 @@ lambda_compare_df <- train_test_df %>%
       lambda_imp_mean = "Mean across imputed datasets"
     )
   ) %>%
-  clean_common()
+  filter(is.finite(lambda))
 
-p6c <- ggplot(lambda_compare_df, aes(x = pi, y = lambda, fill = lambda_type)) +
-  geom_boxplot(
-    alpha = 0.75,
-    position = position_dodge(width = 0.8),
-    outlier.shape = NA,
-    width = 0.7
+p6c <- ggplot(lambda_compare_hist_df, aes(x = lambda, fill = lambda_type)) +
+  geom_histogram(
+    position = "identity",
+    alpha = 0.5,
+    bins = 30
   ) +
-  facet_grid(beta_type + rho ~ mechanism) +
   labs(
     title = "Selected Lambda: Complete-data vs Imputed-data Analyses",
-    subtitle = "Comparing the benchmark lambda with the average lambda selected across imputations",
-    x = "Missingness proportion (pi)",
-    y = "Selected lambda",
+    subtitle = "Overlaid distributions of the benchmark lambda and the average lambda across imputations",
+    x = "Selected lambda",
+    y = "Count",
     fill = "Lambda source"
   )
-
 print(p6c)
-save_plot(p6c, "fig6c_train_test_lambda_compare.png", width = 13, height = 9)
+save_plot(p6c, "fig6c_train_test_lambda_compare_histogram.png", width = 10, height = 6)
+
 # ---------------------------------------------------------
 # Figure 7: Gap analysis (train-test)
 # ---------------------------------------------------------
@@ -630,7 +594,6 @@ cat("  fig0c_histogram_R_coefMean_cv.png\n\n")
 cat("Baseline (estimation-level):\n")
 cat("  fig1_main_effect_missingness_baseline_cv.png\n")
 cat("  fig2_pooling_strategy_baseline_cv_boxplot.png\n")
-cat("  fig2b_pooling_strategy_baseline_cv_by_pi.png\n")
 cat("  fig3_pooling_strategy_baseline_fixed1_boxplot.png\n")
 cat("  fig4_lambda_sensitivity_boxplot.png\n\n")
 
@@ -643,6 +606,6 @@ cat("Train-test (out-of-sample):\n")
 cat("  fig6_train_test_pooling_strategy_boxplot.png\n")
 cat("  fig7a_train_test_gap_poolmse_vs_mean.png\n")
 cat("  fig7b_train_test_gap_poolmse_vs_svd.png\n")
-cat("  fig6b_train_test_lambda_mean_sd.png\n")
-cat("  fig6c_train_test_lambda_compare.png\n")
+cat("  fig6b_train_test_lambda_histogram.png")
+cat("  fig6c_train_test_lambda_compare_histogram.png")
 cat("  fig7c_train_test_gap_mean_vs_svd.png\n\n")
