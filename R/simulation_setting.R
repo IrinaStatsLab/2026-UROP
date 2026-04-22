@@ -31,7 +31,7 @@ p <- b * K                      # total number of predictors (50)
 M_risk <- 11:30                 # 20 predictors can be missing; others are anchors
 
 # Fixed Scenario grids
-beta_grid <- c("dense")
+beta_grid <- c("sparse")
 mech_grid <- c("MAR")
 
 # Varied Scenario grids
