@@ -32,7 +32,7 @@ M_risk <- 11:30                 # 20 predictors can be missing; others are ancho
 
 # Fixed Scenario grids
 beta_grid <- c("dense")
-mech_grid <- c("MCAR")
+mech_grid <- c("MAR")
 
 # Varied Scenario grids
 rho_grid <- c(0.2, 0.5, 0.8) # collinearity levels
