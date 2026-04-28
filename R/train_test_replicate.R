@@ -15,7 +15,6 @@ run_one_replicate_train_test <- function(rho, pi, beta_type, mechanism,
     n = n, b = b, K = K, rho = rho, beta_type = beta_type,
     s = s, signal = signal, sigma_eps = sigma_eps, seed = seed
   )
-  colnames(X_full) <- paste0("X", seq_len(p))
   
   # Step 2: Split into training and test sets
   split_obj <- split_data(dat, train_prop = train_prop, seed = seed + 1000)
