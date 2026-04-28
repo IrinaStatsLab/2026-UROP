@@ -1,15 +1,8 @@
 
 # R/simulation_setting.R
+# Global settings for simulation study
 
-# Install Missing Packages and Load All Required Packages
-## Notes on key packages:
-## - MASS: multivariate normal generator (mvrnorm) used in the data generating mechanism
-## - mice: multiple imputation (mice)
-## - glmnet: ridge fitting (glmnet) and optional CV tuning (cv.glmnet)
-## - dplyr: result wrangling (bind_rows, group_by, summarize, etc.)
-## - foreach + doParallel: parallel simulation replications
-## - doRNG:guarantees reproducible random number streams when running simulations in parallel.
-## - rsample: train test split
+# Load required packages
 pkgs <- c("MASS", "mice", "glmnet", "dplyr", "foreach", 
           "doParallel", "doRNG", "rsample")
 for (pkg in pkgs) {
@@ -24,37 +17,31 @@ library(doParallel)
 library(doRNG) 
 library(rsample)
 
-## Global constants (Protocol)
+# Data-generating setup
 b <- 10                         # block size
 K <- 5                          # number of blocks
 p <- b * K                      # total number of predictors (50)
 M_risk <- 11:30                 # 20 predictors can be missing; others are anchors
 
-# Fixed Scenario grids
-beta_grid <- c("dense")        #"sparse" / "dense"
-mech_grid <- c("MAR")           #"MAR" / "MCAR"
+# Scenario grids
+beta_grid <- c("dense")         # "sparse" / "dense"
+mech_grid <- c("MAR")           # "MAR" / "MCAR"
+rho_grid <- c(0.2, 0.5, 0.8)    # collinearity levels
+pi_grid  <- c(0.2, 0.5, 0.8)    # missingness proportion
+n_grid   <- c(500, 1000)        # sample size
 
-# Varied Scenario grids
-rho_grid <- c(0.2, 0.5, 0.8) # collinearity levels
-pi_grid  <- c(0.2, 0.5, 0.8) # missingness proportion among M_risk variables
-n_grid   <- c(500, 1000) # sample size
-
-## Settings
+# Model Settings
 s <- 10                         # number of nonzero coefficients in sparse setting
-signal <- 1.0                   # coefficient magnitude / signal strength
+signal <- 1.0                   # signal strength
 sigma_eps <- 1.0                # noise SD in outcome model
 lambda_mode <- "fixed_constant" #"complete_data_fixed" / "fixed_constant"
 lambda_fixed_value <- 1.0
 
-## Feature selection settings
-perm_m <- 30                     # permutations per replicate (null max|beta|)
-sel_alpha <- 0.95                # quantile for selection threshold
-
-## MI settings
+# Multiple imputation settings
 m_imp <- 5                    
-R_reps <- 200                   # number of Monte Carlo replications 
+R_reps <- 200                 
 
-## Simulation settings
+# Simulation control
 seed0 <- 123
 ncores <- max(1, parallel::detectCores() - 1)
 
