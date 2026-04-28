@@ -1,7 +1,7 @@
 
 # R/split_data.R
+# Split complete data into training and test sets (used in train–test framework
 
-# Split complete data into training and test sets (used in train–test framework)
 split_data <- function(complete_obj, train_prop = 0.8, seed = NULL) {
   
   if (!is.null(seed)) set.seed(seed)
