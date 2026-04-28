@@ -2,7 +2,9 @@
 **Pooling Strategies for Ridge Regression with Multiple Imputation**
 
 ## Overview
+
 This repository contains the implementation for a simulation study investigating how different pooling strategies affect the estimation of mean squared error (MSE) when ridge regression is combined with multiple imputation (MICE).
+
 ---
 
 ## Dependencies
