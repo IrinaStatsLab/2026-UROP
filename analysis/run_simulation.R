@@ -1,6 +1,6 @@
 
-# simulation/R/run_simulation.R
-# Run full simulation across scenarios and replicates
+# R/run_simulation.R
+# Purpose: Run baseline simulation across scenarios and aggregate results.
 
 library(MASS)
 library(mice)
@@ -52,23 +52,21 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
     "intercept_ridge", "predict_from_pooled_beta",
     "pool_beta_mean", "beta_pool_svd",
     "make_sigma_block_ar1", "make_beta",
-    "mse", "ridge_select_perm_threshold",
-    "run_mice_pmm", "select_ridge_lambda_cv",
+    "mse", "run_mice_pmm", "select_ridge_lambda_cv",
     "inv_logit"
   )
   
   export_globals <- c(
     "b", "K", "s", "signal", "sigma_eps",
     "M_risk", "lambda_mode", "lambda_fixed_value",
-    "m_imp", "perm_m", "sel_alpha"
+    "m_imp"
   )
   
+  # Loop over all simulation scenarios
   for (scen in seq_len(nrow(scenarios))) {
     sc <- scenarios[scen, ]
     
-    cat("\nScenario", scen, "/", nrow(scenarios), "\n")
-    flush.console()
-    
+    # Run Monte Carlo replicates in parallel
     res <- foreach::foreach(
       r = seq_len(R_reps),
       .combine = dplyr::bind_rows,
@@ -85,8 +83,6 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
         M_risk = M_risk,
         lambda_mode = lambda_mode,
         m_imp = m_imp,
-        perm_m = perm_m,
-        sel_alpha = sel_alpha,
         seed = seed0 + 100000 * scen + r
       )
     }
@@ -95,6 +91,7 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
   
   replicate_results <- dplyr::bind_rows(results_all)
   
+  # Aggregate replicate-level results by scenario
   results_table <- replicate_results %>%
     group_by(n, rho, pi, beta_type, mechanism) %>%
     summarise(
@@ -109,29 +106,18 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
       
       ratio_R_mean = mean(ratio_R, na.rm = TRUE),
       ratio_R_sd   = sd(ratio_R, na.rm = TRUE),
-      ratio_R_var_mean = mean(ratio_R_var, na.rm = TRUE),
       
       pooled_coef_mse_mean_mean = mean(pooled_coef_mse_mean, na.rm = TRUE),
       pooled_coef_mse_mean_sd   = sd(pooled_coef_mse_mean, na.rm = TRUE),
       
       ratio_R_coef_mean_mean = mean(ratio_R_coef_mean, na.rm = TRUE),
       ratio_R_coef_mean_sd   = sd(ratio_R_coef_mean, na.rm = TRUE),
-      ratio_R_coef_mean_var_mean = mean(ratio_R_coef_mean_var, na.rm = TRUE),
       
       pooled_coef_mse_svd_mean = mean(pooled_coef_mse_svd, na.rm = TRUE),
       pooled_coef_mse_svd_sd   = sd(pooled_coef_mse_svd, na.rm = TRUE),
       
       ratio_R_coef_svd_mean = mean(ratio_R_coef_svd, na.rm = TRUE),
       ratio_R_coef_svd_sd   = sd(ratio_R_coef_svd, na.rm = TRUE),
-      ratio_R_coef_svd_var_mean = mean(ratio_R_coef_svd_var, na.rm = TRUE),
-      
-      sel_threshold_mean = mean(sel_threshold, na.rm = TRUE),
-      n_selected_mean    = mean(n_selected, na.rm = TRUE),
-      
-      l2_delta_beta_mean_mean = mean(l2_delta_beta_mean, na.rm = TRUE),
-      l2_delta_beta_svd_mean  = mean(l2_delta_beta_svd, na.rm = TRUE),
-      
-      imp_fail_rate = mean(imp_failed, na.rm = TRUE),
       .groups = "drop"
     )
   
@@ -141,7 +127,7 @@ run_simulation <- function(rho_grid, pi_grid, beta_grid, mech_grid,
   )
 }
 
-cat("\n--- Running paired simulation ---\n")
+cat("\n--- Running baseline simulation ---\n")
 
 sim_out <- run_simulation(
   rho_grid = rho_grid,
@@ -153,11 +139,13 @@ sim_out <- run_simulation(
   ncores = ncores
 )
 
+# Save results
 results_table <- sim_out$summary
 replicate_results <- sim_out$replicate
 
 if (!dir.exists("output")) dir.create("output", recursive = TRUE)
 if (!dir.exists("output/rds")) dir.create("output/rds", recursive = TRUE)
+if (!dir.exists("output/tables")) dir.create("output/tables", recursive = TRUE)
 
 write.csv(results_table, "output/tables/results_table.csv", row.names = FALSE)
 saveRDS(replicate_results, "output/rds/replicate_results.rds")
