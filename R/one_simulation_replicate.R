@@ -1,13 +1,6 @@
 
 # R/one_simulation_replicate.R
 # Purpose: Perform one simulation replicate under the baseline framework.
-# Pipeline:
-# 1) Generate complete data (X_full, y)
-# 2) Compute complete-data benchmark MSE
-# 3) Impose missingness (MCAR or MAR)
-# 4) Apply multiple imputation (MICE)
-# 5) Fit ridge models on each imputed dataset
-# 6) Compare pooling strategies via MSE
 
 run_one_replicate <- function(rho, pi, beta_type, mechanism,
                               n, b, K, s, signal, sigma_eps,
