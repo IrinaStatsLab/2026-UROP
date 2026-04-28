@@ -1,5 +1,6 @@
+
 # R/run_simulation_train_test.R
-# Run simulation using train/test pipeline
+# Run train-test simulation across scenarios and aggregate results
 
 library(MASS)
 library(mice)
@@ -62,12 +63,11 @@ run_simulation_train_test <- function(rho_grid, pi_grid, beta_grid, mech_grid,
     "M_risk", "m_imp"
   )
   
+  # Loop over all simulation scenarios
   for (scen in seq_len(nrow(scenarios))) {
     sc <- scenarios[scen, ]
     
-    cat("\nScenario", scen, "/", nrow(scenarios), "\n")
-    flush.console()
-    
+    # Run Monte Carlo replicates in parallel
     res <- foreach::foreach(
       r = seq_len(R_reps),
       .combine = dplyr::bind_rows,
@@ -92,6 +92,7 @@ run_simulation_train_test <- function(rho_grid, pi_grid, beta_grid, mech_grid,
   
   replicate_results <- dplyr::bind_rows(results_all)
   
+  # Aggregate replicate-level results by scenario
   results_table <- replicate_results %>%
     group_by(n, rho, pi, beta_type, mechanism) %>%
     summarise(
@@ -122,11 +123,6 @@ run_simulation_train_test <- function(rho_grid, pi_grid, beta_grid, mech_grid,
       
       ratio_R_coef_svd_test_mean = mean(ratio_R_coef_svd_test, na.rm = TRUE),
       ratio_R_coef_svd_test_sd   = sd(ratio_R_coef_svd_test, na.rm = TRUE),
-      
-      l2_delta_beta_mean_mean = mean(l2_delta_beta_mean, na.rm = TRUE),
-      l2_delta_beta_svd_mean  = mean(l2_delta_beta_svd, na.rm = TRUE),
-      
-      imp_fail_rate = mean(imp_failed, na.rm = TRUE),
       .groups = "drop"
     )
   
@@ -148,11 +144,13 @@ sim_out_train_test <- run_simulation_train_test(
   ncores = ncores
 )
 
+# Save results
 results_table_train_test <- sim_out_train_test$summary
 replicate_results_train_test <- sim_out_train_test$replicate
 
 if (!dir.exists("output")) dir.create("output", recursive = TRUE)
 if (!dir.exists("output/rds")) dir.create("output/rds", recursive = TRUE)
+if (!dir.exists("output/tables")) dir.create("output/tables", recursive = TRUE)
 
 write.csv(results_table_train_test,
           "output/tables/results_table_train_test.csv",
