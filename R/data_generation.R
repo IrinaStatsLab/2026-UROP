@@ -1,20 +1,11 @@
 
 # R/data_generation.R
-# Contains: block autoregression covariance construction, true coefficient generation, and data generation.
+# Data-generating process (DGP) for simulation study
 
-## Logistic inverse function (Used in MAR missingness later)
+## Logistic inverse function (Used in MAR missingness)
 inv_logit <- function(x) 1 / (1 + exp(-x))
 
-## Generate block autoregression covariance matrix
-## Within each block, each predictor has autoregression correlation with the others; 
-## Across blocks, each predictor is independent of the others.
-##
-## b   : block size
-## K   : number of blocks
-## rho : within-block autoregression correlation parameter (0 < rho < 1)
-##
-## Returns: p x p covariance matrix, where p = b * K
-
+# Construct block AR(1) covariance matrix (within-block correlation, across-block independence)
 make_sigma_block_ar1 <- function(b, K, rho) {
   Sigma_block <- outer(1:b, 1:b, function(i, j) rho^abs(i - j))
   Sigma <- matrix(0, nrow = b*K, ncol = b*K)
@@ -25,15 +16,7 @@ make_sigma_block_ar1 <- function(b, K, rho) {
   Sigma
 }
 
-## Construct true coefficient vector beta
-##
-## p         : number of predictors
-## beta_type : "sparse" or "dense"
-## s         : number of non-zero coefficients when sparse
-## signal    : signal magnitude
-##
-## Returns: beta (length p) true coefficient vector
-
+# Generate true coefficient vector (sparse or dense)
 make_beta <- function(p, beta_type = c("sparse", "dense"),
                       s = 10, signal = 1.0, seed = NULL) {
   beta_type <- match.arg(beta_type)
@@ -49,9 +32,7 @@ make_beta <- function(p, beta_type = c("sparse", "dense"),
   beta
 }
 
-## Generate complete data under linear model y = X beta + eps
-## setting must contain: n, b, K, rho, beta_type, s, signal, sigma_eps
-
+# Generate complete data under linear model y = X beta + eps
 generate_complete_data <- function(n, b, K, rho, beta_type,
                                    s = 10, signal = 1.0,
                                    sigma_eps = 1.0, seed = NULL) {
