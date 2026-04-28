@@ -3,8 +3,6 @@
 
 ## Overview
 This repository contains the implementation for a simulation study investigating how different pooling strategies affect the estimation of mean squared error (MSE) when ridge regression is combined with multiple imputation (MICE).
-
-The primary objective is to assess how well different pooling strategies estimate MSE as a target parameter relative to the complete-data benchmark under missing data.
 ---
 
 ## Dependencies
