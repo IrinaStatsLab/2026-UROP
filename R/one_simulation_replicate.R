@@ -1,21 +1,21 @@
 
 # R/one_simulation_replicate.R
-# Purpose: Compare ridge regression under complete data and under missing data with multiple imputation.
-# Design:
-# 1) Generate one complete dataset (X_full, y).
-# 2) Complete-data benchmark: fit ridge on X_full and evaluate on X_full.
-# 3) Missing-data arm: impose missingness on X_full, perform MICE,
-#    fit ridge on each imputed dataset, and evaluate all MI-based MSEs on the corresponding imputed dataset Xj.
-
-cat(">>> Start replicate\n"); flush.console()
+# Purpose: Perform one simulation replicate under the baseline framework.
+# Pipeline:
+# 1) Generate complete data (X_full, y)
+# 2) Compute complete-data benchmark MSE
+# 3) Impose missingness (MCAR or MAR)
+# 4) Apply multiple imputation (MICE)
+# 5) Fit ridge models on each imputed dataset
+# 6) Compare pooling strategies via MSE
 
 run_one_replicate <- function(rho, pi, beta_type, mechanism,
                               n, b, K, s, signal, sigma_eps,
-                              M_risk, lambda_mode, m_imp, perm_m, sel_alpha, seed) {
+                              M_risk, lambda_mode, m_imp, seed) {
   set.seed(seed)
   p <- b * K
   
-  ## Generate one complete dataset
+  # Step 1: Generate complete dataset
   dat <- generate_complete_data(
     n = n, b = b, K = K, rho = rho, beta_type = beta_type,
     s = s, signal = signal, sigma_eps = sigma_eps, seed = seed
@@ -33,13 +33,12 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
     stop("Unsupported lambda_mode.")
   }
   
-  ## Complete-data benchmark
+  # Step 2: Compute complete-data benchmark (MSE_full)
   fit_full <- fit_ridge_fixed_lambda(X_full, y, lambda_use)
   yhat_full <- predict_ridge(fit_full, X_full)
   mse_full <- mse(y, yhat_full)
-  beta_full <- coef_ridge(fit_full)
   
-  ## Impose missingness
+  # Step 3: Impose missingness on predictors (MCAR or MAR)
   X_mis <- if (mechanism == "MCAR") {
     impose_mcar(X_full, pi, M_risk, seed = seed + 10000)
   } else {
@@ -48,13 +47,10 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
   X_mis <- as.matrix(X_mis)
   colnames(X_mis) <- colnames(X_full)
 
-  ## Multiple imputation
+  # Step 4: Apply multiple imputation (MICE)
   df_mis <- as.data.frame(X_mis)
   df_mis$y <- y
   imp <- run_mice_pmm(df_mis, m = m_imp, seed = seed + 30000)
-  
-  empty_sel <- as.data.frame(matrix(NA_real_, nrow = 1, ncol = p))
-  colnames(empty_sel) <- paste0("sel_X", seq_len(p))
   
   if (is.null(imp)) {
     out0 <- data.frame(
@@ -66,21 +62,14 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
       ratio_R_coef_mean = NA_real_,
       pooled_coef_mse_svd = NA_real_,
       ratio_R_coef_svd = NA_real_,
-      mse_diff_mean = NA_real_,
-      mse_diff_svd = NA_real_,
       mse_imp_sd = NA_real_,
       within_imp_var = NA_real_,
       mse_coef_mean_sd = NA_real_,
       within_coef_mean_var = NA_real_,
       mse_coef_svd_sd = NA_real_,
-      within_coef_svd_var = NA_real_,
-      sel_threshold = NA_real_,
-      n_selected = NA_real_,
-      l2_delta_beta_mean = NA_real_,
-      l2_delta_beta_svd = NA_real_,
-      imp_failed = TRUE
+      within_coef_svd_var = NA_real_
     )
-    return(cbind(out0, empty_sel))
+    return(out0)
   }
   
   ## Containers
@@ -90,11 +79,9 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
   
   beta_imp_mat <- matrix(NA_real_, nrow = p, ncol = m_imp)
   intercept_imp <- rep(NA_real_, m_imp)
-  sel_mat <- matrix(NA_real_, nrow = p, ncol = m_imp)
-  thr_vec <- rep(NA_real_, m_imp)
   X_imp_list <- vector("list", m_imp)
   
-  ## Per-imputation fit
+  # Step 5: Fit ridge model on each imputed dataset
   for (j in seq_len(m_imp)) {
     
     df_j <- tryCatch(mice::complete(imp, action = j), error = function(e) NULL)
@@ -113,20 +100,9 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
     beta_hat <- coef_ridge(fit_j)
     beta_imp_mat[, j] <- as.numeric(beta_hat[paste0("X", seq_len(p))])
     intercept_imp[j] <- intercept_ridge(fit_j)
-    
-    sel_res <- ridge_select_perm_threshold(
-      X = Xj, y = y, lambda_fixed = lambda_use,
-      perm_m = perm_m, sel_alpha = sel_alpha,
-      seed = seed + 40000 + j
-    )
-    thr_vec[j] <- sel_res$threshold
-    
-    sel_vec <- as.integer(sel_res$selected)
-    names(sel_vec) <- names(sel_res$selected)
-    sel_mat[, j] <- sel_vec[paste0("X", seq_len(p))]
   }
   
-  ## Pool coefficients
+  # Step 6: Pool coefficients across imputations
   good_beta_cols <- which(colSums(!is.na(beta_imp_mat)) == p)
   
   if (length(good_beta_cols) > 0) {
@@ -146,11 +122,11 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
       Xj <- X_imp_list[[j]]
       if (is.null(Xj)) next
       
-      ## mean pooling
+      ## mean coefficient pooling
       yhat_mean <- predict_from_pooled_beta(beta_pool_mean, intercept_pool, Xj)
       mse_beta_pool_mean[j] <- mse(y, yhat_mean)
       
-      ## svd pooling
+      ## SVD coefficient pooling
       yhat_svd <- predict_from_pooled_beta(beta_pool_svd_vec, intercept_pool, Xj)
       mse_beta_pool_svd[j] <- mse(y, yhat_svd)
     }
@@ -162,7 +138,7 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
     mse_beta_pool_svd  <- rep(NA_real_, m_imp)
   }
   
-  ## Summaries
+  # Step 7: Compute MSE-based summary metrics
   pooled_mse <- mean(mse_imp, na.rm = TRUE)
   ratio_R <- pooled_mse / mse_full
   
@@ -194,23 +170,6 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
   ratio_R_coef_svd_mean <- mean(ratio_coef_svd_imp, na.rm = TRUE)
   ratio_R_coef_svd_var  <- var(ratio_coef_svd_imp, na.rm = TRUE)
   
-  delta_beta_mean <- beta_pool_mean - as.numeric(beta_full[paste0("X", seq_len(p))])
-  l2_delta_beta_mean <- sqrt(sum(delta_beta_mean^2, na.rm = TRUE))
-  
-  delta_beta_svd <- beta_pool_svd_vec - as.numeric(beta_full[paste0("X", seq_len(p))])
-  l2_delta_beta_svd <- sqrt(sum(delta_beta_svd^2, na.rm = TRUE))
-  
-  good_cols <- which(colSums(!is.na(sel_mat)) > 0)
-  sel_majority <- rep(NA_real_, p)
-  if (length(good_cols) > 0) {
-    sel_majority <- as.integer(rowMeans(sel_mat[, good_cols, drop = FALSE], na.rm = TRUE) > 0.5)
-  }
-  sel_df <- as.data.frame(t(sel_majority))
-  colnames(sel_df) <- paste0("sel_X", seq_len(p))
-  
-  sel_threshold <- mean(thr_vec, na.rm = TRUE)
-  n_selected <- sum(sel_majority, na.rm = TRUE)
-  
   out <- data.frame(
     n = n, rho = rho, pi = pi, beta_type = beta_type, mechanism = mechanism,
     mse_full = mse_full,
@@ -232,13 +191,7 @@ run_one_replicate <- function(rho, pi, beta_type, mechanism,
     mse_coef_mean_sd = mse_coef_mean_sd,
     within_coef_mean_var = within_coef_mean_var,
     mse_coef_svd_sd = mse_coef_svd_sd,
-    within_coef_svd_var = within_coef_svd_var,
-    sel_threshold = sel_threshold,
-    n_selected = n_selected,
-    l2_delta_beta_mean = l2_delta_beta_mean,
-    l2_delta_beta_svd = l2_delta_beta_svd,
-    imp_failed = FALSE
+    within_coef_svd_var = within_coef_svd_var
   )
-  
-  cbind(out, sel_df)
+  out
 }
