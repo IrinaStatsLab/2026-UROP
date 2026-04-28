@@ -4,7 +4,7 @@
 ## Overview
 This repository contains the implementation for a simulation study investigating how different pooling strategies affect the estimation of mean squared error (MSE) when ridge regression is combined with multiple imputation (MICE).
 
-The primary objective is to evaluate how accurately different methods estimate MSE as a target parameter relative to the complete-data benchmark under missing data.
+The goal is to evaluate how accurately different methods estimate MSE as a target parameter relative to the complete-data benchmark under missing data.
 
 ---
 
@@ -52,13 +52,25 @@ output/
 
 ### 1. Baseline framework
 - Script: `analysis/run_simulation.R`
-- Purpose: Estimate MSE as a target parameter under imputed data
-- Note: No train–test split is used
+- Purpose: Estimate MSE as a target parameter under imputed data  
+- Pipeline:
+  - Uses `data_generation.R`, `impose_missingness.R`, `analysis_utility.R`, and `pooling_coefficients.R`
+  - Uses `one_simulation_replicate.R` for each simulation replicate  
+  - Does **not** use `split_data.R` or `train_test_replicate.R`  
+- Note:
+  - All required functions are automatically sourced within the script
+
+---
 
 ### 2. Train–test framework
 - Script: `analysis/run_simulation_train_test.R`
-- Purpose: Evaluate out-of-sample performance
-- Note: Missingness is imposed on the training set only
+- Purpose: Evaluate out-of-sample performance  
+- Pipeline:
+  - Uses `data_generation.R`, `impose_missingness.R`, `analysis_utility.R`, and `pooling_coefficients.R`
+  - Uses `split_data.R` and `train_test_replicate.R`  
+  - Does **not** use `one_simulation_replicate.R`  
+- Note:
+  - All required functions are automatically sourced within the script
 
 ---
 
@@ -106,15 +118,15 @@ R/simulation_setting.R
 Key parameters:
 
 ```r
-n_grid       # sample size
-pi_grid      # missingness proportion
-rho_grid     # correlation level (collinearity)
-beta_grid    # sparse vs dense
-mech_grid    # MCAR vs MAR
-m_imp        # number of imputations
-R_reps       # number of replicates
+n_grid
+pi_grid
+rho_grid
+beta_grid
+mech_grid
+m_imp
+R_reps
 
-lambda_mode  # "fixed_constant" or "complete_data_fixed"
+lambda_mode
 lambda_fixed_value
 ```
 
@@ -122,7 +134,7 @@ lambda_fixed_value
 
 ## Important Notes
 
-- **Baseline and train–test frameworks should be run separately**
-- Changing any parameter (e.g., `pi_grid`, `rho_grid`, `mech_grid`, `lambda_mode`) requires rerunning the simulation
-- Results are not automatically updated unless the simulation is rerun
-- Parallel computing is used for efficiency
+- Baseline and train–test frameworks should be run separately  
+- Changing any simulation setting requires rerunning the simulation  
+- Results will not update automatically unless the simulation is rerun  
+- Parallel computing is used for efficiency  
