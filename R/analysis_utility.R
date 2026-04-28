@@ -33,3 +33,47 @@ intercept_ridge <- function(fit) {
 predict_from_pooled_beta <- function(beta, intercept, X_eval) {
   as.numeric(intercept + X_eval %*% beta)
 }
+
+# Compute MSE
+mse <- function(y_true, y_pred) {
+  mean((y_true - y_pred)^2)
+}
+
+# Run MICE with predictive mean matching
+run_mice_pmm <- function(df, m, seed) {
+  tryCatch({
+    ini <- mice::mice(df, m = 1, maxit = 0, printFlag = FALSE)
+    method <- ini$method
+    pred   <- ini$predictorMatrix
+    
+    method["y"] <- ""
+    method[setdiff(names(df), "y")] <- "pmm"
+    pred[, "y"] <- 1
+    pred["y", ] <- 0
+    
+    mice::mice(
+      df,
+      m = m,
+      method = method,
+      predictorMatrix = pred,
+      printFlag = FALSE,
+      seed = seed
+    )
+  }, error = function(e) NULL)
+}
+
+# Select ridge penalty using cross-validation
+select_ridge_lambda_cv <- function(X, y, seed = NULL, nfolds = 5) {
+  if (!is.null(seed)) set.seed(seed)
+  
+  cv_fit <- glmnet::cv.glmnet(
+    x = as.matrix(X),
+    y = as.numeric(y),
+    alpha = 0,
+    nfolds = nfolds,
+    standardize = TRUE
+  )
+  
+  as.numeric(cv_fit$lambda.min)
+}
+
